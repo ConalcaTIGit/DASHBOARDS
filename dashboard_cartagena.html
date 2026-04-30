@@ -737,7 +737,14 @@ async function loadData() {
       if (k) procMap[k] = (r.Proceso || r.proceso || '').trim();
     });
     rawData.forEach(row => {
-      row._proceso = procMap[get(row, C.NOMBRES).toUpperCase()] || '';
+      // Normalizar clave: intentar Nombres solo, luego Nombres+Apellidos, luego Apellidos+Nombres
+      const nombres   = get(row, C.NOMBRES).trim().toUpperCase();
+      const apellidos = get(row, C.APELLIDOS).trim().toUpperCase();
+      row._proceso =
+        procMap[nombres] ||
+        procMap[(nombres + ' ' + apellidos).trim()] ||
+        procMap[(apellidos + ' ' + nombres).trim()] ||
+        '';
     });
 
     buildFilters();
