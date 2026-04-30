@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indicador de Asistencias – CARTAGENA</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap');
+
+  :root {
+    --naranja: #F47920;
+    --naranja-dark: #C85F0A;
+    --naranja-light: #FFF0E5;
+    --gris-bg: #F4F5F7;
+    --gris-card: #FFFFFF;
+    --gris-borde: #E2E5EA;
+    --gris-texto: #4A5568;
+    --gris-sub: #718096;
+    --negro: #1A202C;
+    --rojo: #E53E3E;
+    --rojo-bg: #FFF5F5;
+    --verde: #38A169;
+    --verde-bg: #F0FFF4;
+    --amarillo: #D69E2E;
+    --amarillo-bg: #FFFFF0;
+    --azul: #3182CE;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: var(--gris-bg);
+    color: var(--negro);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--negro);
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 58px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .logo-circle {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--naranja), #F9A825);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800; color: white;
+    flex-shrink: 0;
+  }
+  .header-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px; font-weight: 700;
+    color: white;
+    letter-spacing: 0.5px;
+  }
+  .header-title span { color: var(--naranja); }
+  .header-right {
+    display: flex; align-items: center; gap: 12px;
+  }
+  #last-update {
+    font-size: 12px; color: #A0AEC0;
+  }
+  #btn-refresh {
+    background: var(--naranja);
+    border: none; color: white;
+    padding: 7px 16px; border-radius: 6px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: background 0.2s;
+  }
+  #btn-refresh:hover { background: var(--naranja-dark); }
+  #btn-refresh:disabled { opacity: 0.6; cursor: default; }
+
+  /* ── LOADING ── */
+  #loading-overlay {
+    position: fixed; inset: 0; background: rgba(26,32,44,0.85);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 999; gap: 20px;
+  }
+  #loading-overlay.hidden { display: none; }
+  .spinner {
+    width: 48px; height: 48px;
+    border: 4px solid rgba(244,121,32,0.3);
+    border-top-color: var(--naranja);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { color: white; font-size: 15px; font-weight: 500; }
+
+  /* ── FILTERS ── */
+  #filter-bar {
+    background: white;
+    border-bottom: 2px solid var(--naranja);
+    padding: 12px 28px;
+    display: flex; flex-wrap: wrap; gap: 12px;
+    align-items: center;
+  }
+  .filter-group {
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .filter-group label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+    text-transform: uppercase; color: var(--gris-sub);
+  }
+  .filter-group select {
+    border: 1.5px solid var(--gris-borde);
+    border-radius: 6px; padding: 5px 28px 5px 10px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px; font-weight: 500; color: var(--negro);
+    background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23718096'/%3E%3C/svg%3E") no-repeat right 10px center;
+    -webkit-appearance: none; appearance: none;
+    cursor: pointer; min-width: 130px;
+  }
+  .filter-group select:focus {
+    outline: none; border-color: var(--naranja);
+  }
+  #filter-nombre {
+    min-width: 200px;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    padding: 20px 28px 32px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  /* ── PAGE TABS ── */
+  .page-tabs {
+    display: flex; gap: 4px; margin-bottom: 18px;
+  }
+  .tab-btn {
+    padding: 8px 20px; border-radius: 8px 8px 0 0;
+    border: none; cursor: pointer;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px; font-weight: 600;
+    background: #DDE1E7; color: var(--gris-sub);
+    transition: all 0.18s;
+  }
+  .tab-btn.active {
+    background: var(--naranja); color: white;
+  }
+  .tab-btn:hover:not(.active) { background: #C8CDD6; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── KPI CARDS ── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .kpi-card {
+    background: white;
+    border-radius: 10px;
+    padding: 16px 18px;
+    border: 1.5px solid var(--gris-borde);
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+  }
+  .kpi-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .kpi-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; background: var(--naranja);
+  }
+  .kpi-label {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.7px;
+    color: var(--gris-sub); margin-bottom: 6px;
+  }
+  .kpi-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 36px; font-weight: 700; line-height: 1;
+    color: var(--negro);
+  }
+  .kpi-value.orange { color: var(--naranja); }
+  .kpi-value.red { color: var(--rojo); }
+  .kpi-value.green { color: var(--verde); }
+
+  /* ── GRID LAYOUT ── */
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .span-2 { grid-column: span 2; }
+
+  /* ── PANEL ── */
+  .panel {
+    background: white;
+    border-radius: 10px;
+    border: 1.5px solid var(--gris-borde);
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 12px 16px;
+    border-bottom: 1.5px solid var(--gris-borde);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-title {
+    font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--negro);
+  }
+  .panel-badge {
+    background: var(--naranja-light); color: var(--naranja-dark);
+    font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 20px;
+  }
+  .panel-body { padding: 0; }
+
+  /* ── TABLES ── */
+  .data-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  .data-table th {
+    background: #F7F8FA;
+    padding: 8px 12px; text-align: left;
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--gris-sub);
+    border-bottom: 1.5px solid var(--gris-borde);
+    position: sticky; top: 0;
+  }
+  .data-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #F0F2F5;
+    color: var(--negro);
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: #FAFBFC; }
+
+  .table-scroll { max-height: 280px; overflow-y: auto; }
+  .table-scroll-lg { max-height: 360px; overflow-y: auto; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .badge-red { background: var(--rojo-bg); color: var(--rojo); }
+  .badge-green { background: var(--verde-bg); color: var(--verde); }
+  .badge-orange { background: var(--naranja-light); color: var(--naranja-dark); }
+  .badge-gray { background: #EDF2F7; color: #4A5568; }
+  .badge-yellow { background: var(--amarillo-bg); color: var(--amarillo); }
+
+  /* ── CHARTS ── */
+  .chart-container {
+    padding: 12px 16px 16px;
+    position: relative;
+  }
+  .chart-container canvas { max-height: 220px; }
+  .chart-container-sm canvas { max-height: 160px; }
+
+  /* ── SEMAFORO ── */
+  .semaforo {
+    width: 10px; height: 10px; border-radius: 50%;
+    display: inline-block; margin-right: 6px; flex-shrink: 0;
+  }
+  .sem-verde { background: var(--verde); }
+  .sem-amarillo { background: var(--amarillo); }
+  .sem-rojo { background: var(--rojo); box-shadow: 0 0 0 3px rgba(229,62,62,0.15); }
+
+  .dias-badge {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700;
+  }
+  .dias-ok { background: var(--verde-bg); color: var(--verde); }
+  .dias-warn { background: var(--amarillo-bg); color: var(--amarillo); }
+  .dias-alert { background: var(--rojo-bg); color: var(--rojo); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center; padding: 32px 16px;
+    color: var(--gris-sub); font-size: 13px;
+  }
+
+  /* ── ERROR BANNER ── */
+  #error-banner {
+    background: #FFF5F5; border: 1.5px solid #FC8181;
+    border-radius: 8px; padding: 12px 16px;
+    margin-bottom: 16px; color: var(--rojo);
+    font-size: 13px; font-weight: 500;
+    display: none;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .grid-3 { grid-template-columns: 1fr 1fr; }
+    .span-2 { grid-column: span 1; }
+    main { padding: 14px 14px 28px; }
+  }
+  @media (max-width: 600px) {
+    .grid-3, .grid-2 { grid-template-columns: 1fr; }
+    .kpi-row { grid-template-columns: 1fr 1fr; }
+    header { padding: 0 14px; }
+    .header-title { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Cargando datos desde Google Sheets…</div>
+</div>
+
+<header>
+  <div class="header-left">
+    <div class="logo-circle">C</div>
+    <div class="header-title">Indicador de Asistencias – <span>CARTAGENA</span></div>
+  </div>
+  <div class="header-right">
+    <span id="last-update"></span>
+    <button id="btn-refresh" onclick="loadData()">↻ Actualizar</button>
+  </div>
+</header>
+
+<div id="filter-bar">
+  <div class="filter-group">
+    <label>Año</label>
+    <select id="f-anio"></select>
+  </div>
+  <div class="filter-group">
+    <label>Mes</label>
+    <select id="f-mes"></select>
+  </div>
+  <div class="filter-group">
+    <label>Día</label>
+    <select id="f-dia"></select>
+  </div>
+  <div class="filter-group">
+    <label>Nombre</label>
+    <select id="f-nombre" style="min-width:200px"></select>
+  </div>
+  <div class="filter-group">
+    <label>Turno</label>
+    <select id="f-turno"></select>
+  </div>
+  <div class="filter-group">
+    <label>Proceso</label>
+    <select id="f-proceso"></select>
+  </div>
+</div>
+
+<main>
+  <div id="error-banner"></div>
+
+  <div class="page-tabs">
+    <button class="tab-btn active" onclick="switchTab('tab1', this)">Asistencia General</button>
+    <button class="tab-btn" onclick="switchTab('tab2', this)">Retardos & Salidas</button>
+    <button class="tab-btn" onclick="switchTab('tab3', this)">Descansos</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       TAB 1: ASISTENCIA GENERAL
+  ═══════════════════════════════════════════ -->
+  <div id="tab1" class="tab-content active">
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Trabajadores</div>
+        <div class="kpi-value orange" id="kpi-total">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Asistieron</div>
+        <div class="kpi-value green" id="kpi-asistieron">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">No Asistieron</div>
+        <div class="kpi-value red" id="kpi-no-asistieron">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">% Inasistencias</div>
+        <div class="kpi-value orange" id="kpi-pct-inasist">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Tiempo Medio Trabajado</div>
+        <div class="kpi-value" id="kpi-tiempo-medio">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Horas Extra (HEA)</div>
+        <div class="kpi-value" id="kpi-horas-extra">–</div>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <!-- Asistieron -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Asistieron</span>
+          <span class="panel-badge" id="badge-asist">0</span>
+        </div>
+        <div class="panel-body table-scroll">
+          <table class="data-table">
+            <thead><tr><th>Nombre</th><th>Cargo</th></tr></thead>
+            <tbody id="tbl-asistieron"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Top 10 inasistencias no justificadas -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Top 10: Inasistencias No Justificadas</span>
+          <span class="panel-badge" id="badge-top-inj">0</span>
+        </div>
+        <div class="panel-body table-scroll">
+          <table class="data-table">
+            <thead><tr><th>Nombre</th><th style="text-align:right">Cant.</th></tr></thead>
+            <tbody id="tbl-top-injustif"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- KPIs derecha + chart inasistencias -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Inasistencias Injustificadas – Evolución</span></div>
+          <div class="chart-container chart-container-sm">
+            <canvas id="chart-inasist-evol"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- No asistieron -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">No Asistieron</span>
+          <span class="panel-badge" id="badge-no-asist">0</span>
+        </div>
+        <div class="panel-body table-scroll">
+          <table class="data-table">
+            <thead><tr><th>Nombre</th><th>Permiso</th><th>Cargo</th></tr></thead>
+            <tbody id="tbl-no-asistieron"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Inasistencias justificadas -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Inasistencias Justificadas</span>
+          <span class="panel-badge" id="badge-justif">0</span>
+        </div>
+        <div class="panel-body table-scroll">
+          <table class="data-table">
+            <thead><tr><th>Nombre</th><th>Permiso</th><th style="text-align:right">#</th></tr></thead>
+            <tbody id="tbl-justificadas"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       TAB 2: RETARDOS & SALIDAS TEMPRANO
+  ═══════════════════════════════════════════ -->
+  <div id="tab2" class="tab-content">
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Retardos</div>
+        <div class="kpi-value red" id="kpi-retardos">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Salidas Temprano</div>
+        <div class="kpi-value orange" id="kpi-salidas">–</div>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <!-- Inasistencias por proceso -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Inasistencias por Proceso</span></div>
+        <div class="chart-container"><canvas id="chart-por-proceso"></canvas></div>
+        <div class="panel-body table-scroll" style="border-top:1.5px solid var(--gris-borde)">
+          <table class="data-table">
+            <thead><tr><th>Proceso</th><th style="text-align:right">Cant.</th></tr></thead>
+            <tbody id="tbl-por-proceso"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Inasistencias por cargo -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Inasistencias por Cargo</span></div>
+        <div class="chart-container"><canvas id="chart-por-cargo"></canvas></div>
+        <div class="panel-body table-scroll" style="border-top:1.5px solid var(--gris-borde)">
+          <table class="data-table">
+            <thead><tr><th>Cargo</th><th style="text-align:right">Cant.</th></tr></thead>
+            <tbody id="tbl-por-cargo"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Top 10 empleados llegadas tarde -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Top 10: Llegadas Tarde</span></div>
+          <div class="panel-body table-scroll-lg">
+            <table class="data-table">
+              <thead><tr><th>Nombre</th><th style="text-align:right">Días</th><th style="text-align:right">Tiempo Ac.</th></tr></thead>
+              <tbody id="tbl-top-tarde"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Llegadas Tarde – Evolución</span></div>
+          <div class="chart-container chart-container-sm"><canvas id="chart-tarde-evol"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       TAB 3: SEMÁFORO DE DESCANSOS
+  ═══════════════════════════════════════════ -->
+  <div id="tab3" class="tab-content">
+    <div style="background:white;border-radius:10px;border:1.5px solid var(--gris-borde);padding:14px 18px;margin-bottom:16px;font-size:13px;line-height:1.6;color:var(--gris-texto)">
+      <strong style="color:var(--negro)">¿Cómo funciona este semáforo?</strong><br>
+      Muestra el último día de descanso registrado por trabajador en el período filtrado.
+      <span class="semaforo sem-verde" style="margin-left:10px"></span><strong>Verde</strong>: ≤ 6 días sin descanso &nbsp;
+      <span class="semaforo sem-amarillo"></span><strong>Amarillo</strong>: 7 días &nbsp;
+      <span class="semaforo sem-rojo"></span><strong>Rojo</strong>: &gt; 7 días — requiere atención.
+    </div>
+
+    <div class="kpi-row" style="grid-template-columns:repeat(3,1fr);max-width:500px">
+      <div class="kpi-card">
+        <div class="kpi-label">En alerta 🔴</div>
+        <div class="kpi-value red" id="kpi-sem-rojo">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Advertencia 🟡</div>
+        <div class="kpi-value" style="color:var(--amarillo)" id="kpi-sem-amarillo">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Al día 🟢</div>
+        <div class="kpi-value green" id="kpi-sem-verde">–</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Último día de descanso por trabajador</span>
+        <span class="panel-badge" id="badge-descansos">0</span>
+      </div>
+      <div class="panel-body table-scroll-lg">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Cargo</th>
+              <th>Último Descanso</th>
+              <th>Días sin descanso</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-descansos"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ─── URLS ────────────────────────────────────────────────────────────────────
+const URL_ASIST = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTO6s7dfqRPyuzhLou-LCwRDgP-XH7JxKaAI78A--fzRxAhWTS7fGsDq-45oVLybaOQa3K7ufN68onS/pub?gid=0&single=true&output=csv";
+const URL_PROC  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTO6s7dfqRPyuzhLou-LCwRDgP-XH7JxKaAI78A--fzRxAhWTS7fGsDq-45oVLybaOQa3K7ufN68onS/pub?gid=1030548868&single=true&output=csv";
+
+// ─── GLOBALS ─────────────────────────────────────────────────────────────────
+let rawData = [];
+let procMap = {};   // nombre → proceso
+let charts = {};
+const MESES = { '01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio','07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre' };
+
+// ─── CSV PARSER ───────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.split('\n').filter(l => l.trim());
+  if (!lines.length) return [];
+  const headers = splitCSVLine(lines[0]);
+  return lines.slice(1).map(line => {
+    const vals = splitCSVLine(line);
+    const obj = {};
+    headers.forEach((h, i) => obj[h.trim()] = (vals[i] || '').trim());
+    return obj;
+  });
+}
+
+function splitCSVLine(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+// ─── DATE HELPERS ─────────────────────────────────────────────────────────────
+// Date format: "lun 20-04-2026" or "mar 31-03-2026"
+function parseDate(str) {
+  if (!str) return null;
+  const m = str.match(/(\d{2})-(\d{2})-(\d{4})/);
+  if (!m) return null;
+  return new Date(+m[3], +m[2]-1, +m[1]);
+}
+function fmtDate(d) {
+  if (!d) return '–';
+  return d.toLocaleDateString('es-CO', {day:'2-digit',month:'short',year:'numeric'});
+}
+function extractYearMonthDay(row) {
+  const d = parseDate(row.Fecha);
+  if (!d) return { anio: '?', mes: '??', dia: '??' };
+  const anio = String(d.getFullYear());
+  const mes = String(d.getMonth()+1).padStart(2,'0');
+  const dia = String(d.getDate()).padStart(2,'0');
+  return { anio, mes, dia };
+}
+
+// ─── TIME HELPERS ─────────────────────────────────────────────────────────────
+function timeToMinutes(t) {
+  if (!t || t === '00:00') return 0;
+  const parts = t.split(':');
+  return parseInt(parts[0]||0)*60 + parseInt(parts[1]||0);
+}
+function minutesToHHMM(mins) {
+  if (!mins) return '0:00';
+  const h = Math.floor(mins/60);
+  const m = String(Math.abs(mins)%60).padStart(2,'0');
+  return `${h}:${m}`;
+}
+
+// ─── LOAD DATA ────────────────────────────────────────────────────────────────
+async function loadData() {
+  showLoading(true);
+  hideError();
+  document.getElementById('btn-refresh').disabled = true;
+
+  try {
+    const [r1, r2] = await Promise.all([
+      fetch(URL_ASIST + '&_=' + Date.now()),
+      fetch(URL_PROC  + '&_=' + Date.now())
+    ]);
+    if (!r1.ok) throw new Error('No se pudo conectar al sheet principal');
+    if (!r2.ok) throw new Error('No se pudo conectar al sheet de procesos');
+
+    const [csv1, csv2] = await Promise.all([r1.text(), r2.text()]);
+
+    rawData = parseCSV(csv1).filter(r => r.Nombres || r.Apellidos);
+    const procRows = parseCSV(csv2);
+    procMap = {};
+    procRows.forEach(r => {
+      if (r.Nombres) procMap[r.Nombres.trim().toUpperCase()] = r.Proceso || r.proceso || '';
+    });
+
+    // attach parsed date & year/month/day
+    rawData.forEach(r => {
+      r._date = parseDate(r.Fecha);
+      const ymd = extractYearMonthDay(r);
+      r._anio = ymd.anio;
+      r._mes = ymd.mes;
+      r._dia = ymd.dia;
+      r._proceso = procMap[(r.Nombres||'').trim().toUpperCase()] || '';
+    });
+
+    buildFilters();
+    renderAll();
+
+    document.getElementById('last-update').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-CO');
+  } catch (e) {
+    showError('Error al cargar datos: ' + e.message + '. Verifica que el sheet esté publicado como CSV.');
+  } finally {
+    showLoading(false);
+    document.getElementById('btn-refresh').disabled = false;
+  }
+}
+
+// ─── FILTERS ─────────────────────────────────────────────────────────────────
+function buildFilters() {
+  const anios  = [...new Set(rawData.map(r => r._anio))].sort();
+  const meses  = [...new Set(rawData.map(r => r._mes))].sort();
+  const dias   = [...new Set(rawData.map(r => r._dia))].sort((a,b)=>+a-+b);
+  const nombres = [...new Set(rawData.map(r => r.Nombres).filter(Boolean))].sort();
+  const turnos = [...new Set(rawData.map(r => r.Turno).filter(Boolean))].sort();
+  const procs  = [...new Set(rawData.map(r => r._proceso).filter(Boolean))].sort();
+
+  populate('f-anio', anios, anios[anios.length-1]);
+  populate('f-mes',  meses.map(m => ({val:m, label:MESES[m]||m})), meses[meses.length-1]);
+  populate('f-dia',  ['',...dias], '');
+  populate('f-nombre', ['',...nombres], '');
+  populate('f-turno', ['',...turnos], '');
+  populate('f-proceso', ['',...procs], '');
+
+  ['f-anio','f-mes','f-dia','f-nombre','f-turno','f-proceso'].forEach(id => {
+    document.getElementById(id).addEventListener('change', renderAll);
+  });
+}
+
+function populate(id, items, selected) {
+  const sel = document.getElementById(id);
+  const prev = sel.value;
+  sel.innerHTML = '';
+  items.forEach(item => {
+    const v = typeof item === 'object' ? item.val : item;
+    const l = typeof item === 'object' ? item.label : (v || 'Todas');
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = l || 'Todas';
+    if (v === (prev || selected)) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function getFilters() {
+  return {
+    anio:    document.getElementById('f-anio').value,
+    mes:     document.getElementById('f-mes').value,
+    dia:     document.getElementById('f-dia').value,
+    nombre:  document.getElementById('f-nombre').value,
+    turno:   document.getElementById('f-turno').value,
+    proceso: document.getElementById('f-proceso').value,
+  };
+}
+
+function applyFilters() {
+  const f = getFilters();
+  return rawData.filter(r => {
+    if (f.anio    && r._anio !== f.anio) return false;
+    if (f.mes     && r._mes  !== f.mes)  return false;
+    if (f.dia     && r._dia  !== f.dia)  return false;
+    if (f.nombre  && r.Nombres !== f.nombre) return false;
+    if (f.turno   && r.Turno  !== f.turno)   return false;
+    if (f.proceso && r._proceso !== f.proceso) return false;
+    return true;
+  });
+}
+
+// ─── MAIN RENDER ─────────────────────────────────────────────────────────────
+function renderAll() {
+  const data = applyFilters();
+  renderTab1(data);
+  renderTab2(data);
+  renderTab3(data);
+}
+
+// ─── TAB 1 ────────────────────────────────────────────────────────────────────
+function renderTab1(data) {
+  const descanso = r => r.Turno === 'Descanso';
+  const tienePermiso = r => r.Permiso && r.Permiso !== 'Ninguno';
+
+  // "Worked" rows: has entry time OR turno != Descanso AND no absence-type permiso
+  const trabajadores = [...new Set(data.map(r => r.Nombres).filter(Boolean))];
+  const total = trabajadores.length;
+
+  // Per-date unique workers
+  const fechas = [...new Set(data.map(r => r.Fecha).filter(Boolean))];
+
+  // For period: who attended at least once
+  const asistieronSet = new Set(data.filter(r => r['Entró'] || r['Entró_2']).map(r => r.Nombres));
+  // Simpler: filter rows where entry time exists
+  const asistRows = data.filter(r => {
+    const entro = r['Entró'] || r['Entró '] || '';
+    return entro && entro !== '' && !descanso(r);
+  });
+  const asistPersonas = [...new Set(asistRows.map(r => r.Nombres))];
+
+  // Inasistencias: turno=Descanso is a rest day (not absence). 
+  // True absence = no entry + not Descanso + not justified absence permisos
+  const inasistRows = data.filter(r => {
+    if (descanso(r)) return false;
+    const entro = r['Entró'] || r['Entró '] || '';
+    if (entro) return false;
+    return true;
+  });
+
+  const justificados = inasistRows.filter(r => r.Permiso && r.Permiso !== 'Ninguno' && r.Permiso !== '');
+  const injustificados = inasistRows.filter(r => !r.Permiso || r.Permiso === 'Ninguno' || r.Permiso === '');
+
+  const pctInasist = total > 0 ? ((injustificados.length / (total * Math.max(fechas.length,1))) * 100).toFixed(2) : 0;
+
+  // Tiempo medio trabajado
+  let totalMins = 0, countHT = 0;
+  data.forEach(r => {
+    const ht = r['HT'] || '';
+    const mins = timeToMinutes(ht);
+    if (mins > 0) { totalMins += mins; countHT++; }
+  });
+  const medioMins = countHT > 0 ? Math.round(totalMins / countHT) : 0;
+
+  // Horas extra
+  let heaMins = 0;
+  data.forEach(r => {
+    const hea = r['HEA'] || '';
+    heaMins += timeToMinutes(hea);
+  });
+
+  // ── KPIs
+  document.getElementById('kpi-total').textContent = total.toLocaleString('es-CO');
+  document.getElementById('kpi-asistieron').textContent = asistPersonas.length.toLocaleString('es-CO');
+  document.getElementById('kpi-no-asistieron').textContent = [...new Set(inasistRows.map(r=>r.Nombres))].length.toLocaleString('es-CO');
+  document.getElementById('kpi-pct-inasist').textContent = pctInasist + ' %';
+  document.getElementById('kpi-tiempo-medio').textContent = minutesToHHMM(medioMins);
+  document.getElementById('kpi-horas-extra').textContent = minutesToHHMM(heaMins);
+
+  // ── Tabla asistieron
+  const uniqAsist = [...new Set(asistRows.map(r => r.Nombres))].sort();
+  document.getElementById('badge-asist').textContent = uniqAsist.length;
+  const tblA = document.getElementById('tbl-asistieron');
+  tblA.innerHTML = uniqAsist.length ? uniqAsist.map(n => {
+    const cargo = (asistRows.find(r => r.Nombres===n)||{}).Cargo || '–';
+    return `<tr><td>${n}</td><td><span class="badge badge-gray">${cargo}</span></td></tr>`;
+  }).join('') : '<tr><td colspan="2" class="empty-state">Sin datos</td></tr>';
+
+  // ── Tabla no asistieron
+  const noAsistUniq = {};
+  inasistRows.forEach(r => {
+    if (!noAsistUniq[r.Nombres]) noAsistUniq[r.Nombres] = { permiso: r.Permiso || '–', cargo: r.Cargo || '–' };
+  });
+  document.getElementById('badge-no-asist').textContent = Object.keys(noAsistUniq).length;
+  const tblNA = document.getElementById('tbl-no-asistieron');
+  tblNA.innerHTML = Object.keys(noAsistUniq).length ? Object.entries(noAsistUniq).sort(([a],[b])=>a.localeCompare(b)).map(([n,v]) =>
+    `<tr><td>${n}</td><td><span class="badge badge-orange">${v.permiso}</span></td><td>${v.cargo}</td></tr>`
+  ).join('') : '<tr><td colspan="3" class="empty-state">Sin datos</td></tr>';
+
+  // ── Top 10 no justificadas
+  const injCount = {};
+  injustificados.forEach(r => { injCount[r.Nombres] = (injCount[r.Nombres]||0)+1; });
+  const top10 = Object.entries(injCount).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const totalInj = Object.values(injCount).reduce((a,b)=>a+b,0);
+  document.getElementById('badge-top-inj').textContent = totalInj;
+  const tblInj = document.getElementById('tbl-top-injustif');
+  tblInj.innerHTML = top10.length ? top10.map(([n,c]) =>
+    `<tr><td>${n}</td><td style="text-align:right"><span class="badge badge-red">${c}</span></td></tr>`
+  ).join('') + `<tr style="font-weight:700"><td>Total</td><td style="text-align:right">${totalInj}</td></tr>`
+  : '<tr><td colspan="2" class="empty-state">Sin inasistencias injustificadas</td></tr>';
+
+  // ── Tabla justificadas
+  const justCount = {};
+  justificados.forEach(r => {
+    const k = r.Nombres;
+    if (!justCount[k]) justCount[k] = { permiso: r.Permiso, count: 0 };
+    justCount[k].count++;
+  });
+  const sortedJust = Object.entries(justCount).sort((a,b)=>b[1].count-a[1].count);
+  const totalJust = sortedJust.reduce((a,[,v])=>a+v.count, 0);
+  document.getElementById('badge-justif').textContent = totalJust;
+  const tblJust = document.getElementById('tbl-justificadas');
+  tblJust.innerHTML = sortedJust.length ? sortedJust.map(([n,v]) =>
+    `<tr><td>${n}</td><td><span class="badge badge-yellow">${v.permiso}</span></td><td style="text-align:right">${v.count}</td></tr>`
+  ).join('') + `<tr style="font-weight:700"><td>Total</td><td></td><td style="text-align:right">${totalJust}</td></tr>`
+  : '<tr><td colspan="3" class="empty-state">Sin inasistencias justificadas</td></tr>';
+
+  // ── Chart: inasistencias injustificadas por fecha
+  const byDate = {};
+  injustificados.forEach(r => {
+    const d = r.Fecha || '?';
+    byDate[d] = (byDate[d]||0)+1;
+  });
+  const sortedDates = Object.keys(byDate).sort((a,b) => {
+    const da = parseDate(a), db = parseDate(b);
+    return da && db ? da-db : 0;
+  });
+  const labels = sortedDates.map(d => {
+    const dt = parseDate(d);
+    return dt ? dt.toLocaleDateString('es-CO',{day:'2-digit',month:'short'}) : d;
+  });
+  destroyChart('chart-inasist-evol');
+  charts['chart-inasist-evol'] = new Chart(document.getElementById('chart-inasist-evol'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ label:'Inasistencias', data: sortedDates.map(d=>byDate[d]),
+        borderColor:'#F47920', backgroundColor:'rgba(244,121,32,0.12)',
+        tension:0.35, fill:true, pointRadius:3, pointBackgroundColor:'#F47920', borderWidth:2 }]
+    },
+    options: chartOpts('Cantidad')
+  });
+}
+
+// ─── TAB 2 ────────────────────────────────────────────────────────────────────
+function renderTab2(data) {
+  // Retardos: Atraso > '00:00'
+  const retardos = data.filter(r => {
+    const at = r['Atraso'] || r['Atraso '] || '';
+    return at && at !== '00:00';
+  });
+  // Salidas temprano: Adelanto > '00:00'
+  const salidasTemprano = data.filter(r => {
+    const ad = r['Adelanto'] || '';
+    return ad && ad !== '00:00';
+  });
+
+  document.getElementById('kpi-retardos').textContent = retardos.length.toLocaleString('es-CO');
+  document.getElementById('kpi-salidas').textContent = salidasTemprano.length.toLocaleString('es-CO');
+
+  // ── Inasistencias por proceso
+  const descanso = r => r.Turno === 'Descanso';
+  const inasistAll = data.filter(r => {
+    if (descanso(r)) return false;
+    const entro = r['Entró'] || r['Entró '] || '';
+    return !entro;
+  });
+
+  const porProceso = {};
+  inasistAll.forEach(r => {
+    const p = r._proceso || '(Sin proceso)';
+    porProceso[p] = (porProceso[p]||0)+1;
+  });
+  const sortedProc = Object.entries(porProceso).sort((a,b)=>b[1]-a[1]);
+  const totalProc = sortedProc.reduce((a,[,v])=>a+v,0);
+
+  const tblProc = document.getElementById('tbl-por-proceso');
+  tblProc.innerHTML = sortedProc.length ? sortedProc.map(([p,c])=>
+    `<tr><td>${p}</td><td style="text-align:right">${c}</td></tr>`
+  ).join('') + `<tr style="font-weight:700"><td>Total</td><td style="text-align:right">${totalProc}</td></tr>`
+  : '<tr><td colspan="2" class="empty-state">Sin datos</td></tr>';
+
+  destroyChart('chart-por-proceso');
+  charts['chart-por-proceso'] = new Chart(document.getElementById('chart-por-proceso'), {
+    type:'bar',
+    data: { labels: sortedProc.map(([p])=>p), datasets:[{label:'Inasistencias', data:sortedProc.map(([,c])=>c), backgroundColor:'#F47920', borderRadius:4}] },
+    options: chartOpts('Cantidad')
+  });
+
+  // ── Inasistencias por cargo
+  const porCargo = {};
+  inasistAll.forEach(r => {
+    const c = r.Cargo || '(Sin cargo)';
+    porCargo[c] = (porCargo[c]||0)+1;
+  });
+  const sortedCargo = Object.entries(porCargo).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const totalCargo = sortedCargo.reduce((a,[,v])=>a+v,0);
+
+  const tblCargo = document.getElementById('tbl-por-cargo');
+  tblCargo.innerHTML = sortedCargo.length ? sortedCargo.map(([c,n])=>
+    `<tr><td>${c}</td><td style="text-align:right">${n}</td></tr>`
+  ).join('') + `<tr style="font-weight:700"><td>Total</td><td style="text-align:right">${totalCargo}</td></tr>`
+  : '<tr><td colspan="2" class="empty-state">Sin datos</td></tr>';
+
+  destroyChart('chart-por-cargo');
+  charts['chart-por-cargo'] = new Chart(document.getElementById('chart-por-cargo'), {
+    type:'bar',
+    data: {
+      labels: sortedCargo.map(([c])=> c.length>18 ? c.substring(0,17)+'…' : c),
+      datasets:[{label:'Inasistencias', data:sortedCargo.map(([,n])=>n), backgroundColor:'#F47920', borderRadius:4}]
+    },
+    options: chartOpts('Cantidad', true)
+  });
+
+  // ── Top 10 llegadas tarde
+  const tardePorPersona = {};
+  retardos.forEach(r => {
+    const k = r.Nombres;
+    if (!tardePorPersona[k]) tardePorPersona[k] = { count:0, minsTot:0 };
+    tardePorPersona[k].count++;
+    const at = r['Atraso'] || r['Atraso '] || '00:00';
+    tardePorPersona[k].minsTot += timeToMinutes(at);
+  });
+  const top10Tarde = Object.entries(tardePorPersona).sort((a,b)=>b[1].count-a[1].count).slice(0,10);
+
+  const tblTarde = document.getElementById('tbl-top-tarde');
+  tblTarde.innerHTML = top10Tarde.length ? top10Tarde.map(([n,v])=>
+    `<tr><td>${n}</td><td style="text-align:right"><span class="badge badge-orange">${v.count}</span></td><td style="text-align:right">${minutesToHHMM(v.minsTot)}</td></tr>`
+  ).join('') : '<tr><td colspan="3" class="empty-state">Sin retardos</td></tr>';
+
+  // ── Chart llegadas tarde por fecha
+  const tardeByDate = {};
+  retardos.forEach(r => { const d=r.Fecha||'?'; tardeByDate[d]=(tardeByDate[d]||0)+1; });
+  const sortedTD = Object.keys(tardeByDate).sort((a,b)=>{const da=parseDate(a),db=parseDate(b);return da&&db?da-db:0;});
+  const tardeLabels = sortedTD.map(d=>{const dt=parseDate(d);return dt?dt.toLocaleDateString('es-CO',{day:'2-digit',month:'short'}):d;});
+
+  destroyChart('chart-tarde-evol');
+  charts['chart-tarde-evol'] = new Chart(document.getElementById('chart-tarde-evol'), {
+    type:'line',
+    data:{labels:tardeLabels,datasets:[{label:'Llegadas tarde',data:sortedTD.map(d=>tardeByDate[d]),
+      borderColor:'#F47920',backgroundColor:'rgba(244,121,32,0.1)',tension:0.35,fill:true,
+      pointRadius:3,pointBackgroundColor:'#F47920',borderWidth:2}]},
+    options: chartOpts('Cantidad')
+  });
+}
+
+// ─── TAB 3: SEMÁFORO DESCANSOS ────────────────────────────────────────────────
+function renderTab3(data) {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  // Find last descanso date per worker
+  const descansoRows = data.filter(r => r.Turno === 'Descanso' && r._date);
+  const lastDescanso = {};
+  const cargoMap = {};
+  descansoRows.forEach(r => {
+    const n = r.Nombres;
+    if (!n) return;
+    cargoMap[n] = r.Cargo || '–';
+    if (!lastDescanso[n] || r._date > lastDescanso[n]) lastDescanso[n] = r._date;
+  });
+
+  // Also include workers without any descanso in the filtered period
+  data.forEach(r => { if (r.Nombres && !cargoMap[r.Nombres]) cargoMap[r.Nombres] = r.Cargo || '–'; });
+
+  // All workers in filtered data
+  const allWorkers = [...new Set(data.map(r=>r.Nombres).filter(Boolean))].sort();
+
+  let rojoCount=0, amarilloCount=0, verdeCount=0;
+
+  const rows = allWorkers.map(n => {
+    const cargo = cargoMap[n] || '–';
+    const lastD = lastDescanso[n];
+    let diasSin, fechaTxt, badge, semClass;
+
+    if (!lastD) {
+      diasSin = '–';
+      fechaTxt = 'Sin registro';
+      badge = `<span class="dias-badge dias-alert"><span class="semaforo sem-rojo"></span>Sin dato</span>`;
+      semClass = 'rojo';
+      rojoCount++;
+    } else {
+      const diffMs = today - lastD;
+      const diffDias = Math.floor(diffMs / (1000*60*60*24));
+      diasSin = diffDias;
+      fechaTxt = fmtDate(lastD);
+      if (diffDias > 7) {
+        badge = `<span class="dias-badge dias-alert"><span class="semaforo sem-rojo"></span>${diffDias} días</span>`;
+        semClass = 'rojo'; rojoCount++;
+      } else if (diffDias === 7) {
+        badge = `<span class="dias-badge dias-warn"><span class="semaforo sem-amarillo"></span>${diffDias} días</span>`;
+        semClass = 'amarillo'; amarilloCount++;
+      } else {
+        badge = `<span class="dias-badge dias-ok"><span class="semaforo sem-verde"></span>${diffDias} días</span>`;
+        semClass = 'verde'; verdeCount++;
+      }
+    }
+    return { n, cargo, fechaTxt, diasSin, badge, semClass };
+  }).sort((a,b) => {
+    // Sort: rojo first, then amarillo, then verde
+    const order = {rojo:0, amarillo:1, verde:2};
+    return (order[a.semClass]??3) - (order[b.semClass]??3);
+  });
+
+  document.getElementById('kpi-sem-rojo').textContent = rojoCount;
+  document.getElementById('kpi-sem-amarillo').textContent = amarilloCount;
+  document.getElementById('kpi-sem-verde').textContent = verdeCount;
+  document.getElementById('badge-descansos').textContent = allWorkers.length;
+
+  const tbl = document.getElementById('tbl-descansos');
+  tbl.innerHTML = rows.length ? rows.map(r =>
+    `<tr>
+      <td style="font-weight:500">${r.n}</td>
+      <td><span class="badge badge-gray">${r.cargo}</span></td>
+      <td>${r.fechaTxt}</td>
+      <td style="text-align:center">${typeof r.diasSin === 'number' ? r.diasSin : r.diasSin}</td>
+      <td>${r.badge}</td>
+    </tr>`
+  ).join('') : '<tr><td colspan="5" class="empty-state">Sin datos de descanso</td></tr>';
+}
+
+// ─── CHART OPTIONS ────────────────────────────────────────────────────────────
+function chartOpts(yLabel, indexAxis = false) {
+  return {
+    responsive: true, maintainAspectRatio: true,
+    indexAxis: indexAxis ? 'y' : 'x',
+    plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => ` ${ctx.parsed[indexAxis?'x':'y']} ${yLabel.toLowerCase()}` } } },
+    scales: {
+      x: { grid:{color:'rgba(0,0,0,0.05)'}, ticks:{font:{family:'Barlow',size:11},color:'#718096', maxTicksLimit:8} },
+      y: { grid:{color:'rgba(0,0,0,0.05)'}, ticks:{font:{family:'Barlow',size:11},color:'#718096'} }
+    }
+  };
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+// ─── UI HELPERS ──────────────────────────────────────────────────────────────
+function showLoading(v) { document.getElementById('loading-overlay').classList.toggle('hidden', !v); }
+function showError(msg) { const b=document.getElementById('error-banner'); b.textContent=msg; b.style.display='block'; }
+function hideError() { document.getElementById('error-banner').style.display='none'; }
+
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
