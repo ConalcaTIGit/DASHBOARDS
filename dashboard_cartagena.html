@@ -612,7 +612,15 @@ function parseCSV(text) {
   return lines.slice(1).map(line => {
     const vals = splitCSVLine(line);
     const obj = {};
-    headers.forEach((h, i) => obj[h.trim()] = (vals[i] || '').trim());
+    headers.forEach((h, i) => {
+    let key = h.trim();
+    if (obj[key]) {
+      let j = 2;
+      while (obj[`${key}_${j}`]) j++;
+      key = `${key}_${j}`;
+    }
+    obj[key] = (vals[i] || '').trim();
+  });
     return obj;
   });
 }
@@ -791,9 +799,13 @@ function renderTab1(data) {
   const asistieronSet = new Set(data.filter(r => r['Entró'] || r['Entró_2']).map(r => r.Nombres));
   // Simpler: filter rows where entry time exists
   const asistRows = data.filter(r => {
-    const entro = r['Entró'] || r['Entró '] || '';
+    const entro = Object.keys(r)
+    .filter(k => k.includes('Entró'))
+    .map(k => r[k])
+    .find(v => v && v !== '00:00') || '';
     return entro && entro !== '' && !descanso(r);
   });
+  console.log(rawData[0]);
   const asistPersonas = [...new Set(asistRows.map(r => r.Nombres))];
 
   // Inasistencias: turno=Descanso is a rest day (not absence). 
