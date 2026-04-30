@@ -727,19 +727,20 @@ async function loadData() {
       row._mes   = d ? String(d.getMonth()+1).padStart(2,'0') : '??';
       row._dia   = d ? String(d.getDate()).padStart(2,'0') : '??';
       row._turnoLabel = turnoLabel(get(row, C.TURNO));
+      // Nombre completo = Nombres + Apellidos, siempre en mayúsculas
+      row._nombre = (get(row, C.NOMBRES) + ' ' + get(row, C.APELLIDOS)).trim().toUpperCase();
     });
 
     // Procesos
     const procRows = parseCSVObj(csv2);
     procMap = {};
     procRows.forEach(r => {
-      const k = (r.Nombres || r.nombres || '').trim();
+      const k = (r.Nombres || r.nombres || '').trim().toUpperCase();
       if (k) procMap[k] = (r.Proceso || r.proceso || '').trim();
     });
     rawData.forEach(row => {
-      // Clave = Nombres + Apellidos, tal como viene del sheet (sin alterar mayúsculas)
-      const keyProc = (get(row, C.NOMBRES) + ' ' + get(row, C.APELLIDOS)).trim();
-      row._proceso = procMap[keyProc] || '';
+      // Clave = Nombres + Apellidos en MAYÚSCULAS → match con procesos
+      row._proceso = procMap[row._nombre] || '';
     });
 
     buildFilters();
@@ -759,7 +760,7 @@ function buildFilters() {
   const anios   = [...new Set(rawData.map(r => r._anio))].filter(Boolean).sort();
   const meses   = [...new Set(rawData.map(r => r._mes))].filter(Boolean).sort();
   const dias    = [...new Set(rawData.map(r => r._dia))].filter(v=>v&&v!=='??').sort((a,b)=>+a-+b);
-  const nombres = [...new Set(rawData.map(r => get(r, C.NOMBRES)))].filter(Boolean).sort();
+  const nombres = [...new Set(rawData.map(r => r._nombre))].filter(Boolean).sort();
   // Turno: solo los que NO son Descanso, con label limpio
   const turnosRaw = [...new Set(rawData.map(r => get(r, C.TURNO)).filter(t => t && t !== 'Descanso'))];
   const turnosMap = {}; // label → raw value original
@@ -812,7 +813,7 @@ function applyFilters() {
     if (f.anio    && row._anio !== f.anio) return false;
     if (f.mes     && row._mes  !== f.mes)  return false;
     if (f.dia     && row._dia  !== f.dia)  return false;
-    if (f.nombre  && get(row, C.NOMBRES) !== f.nombre) return false;
+    if (f.nombre  && row._nombre !== f.nombre) return false;
     if (f.turno   && get(row, C.TURNO)   !== f.turno)  return false;
     if (f.proceso && (row._proceso || '(Sin proceso)') !== f.proceso) return false;
     return true;
@@ -830,7 +831,7 @@ function renderAll() {
 // ─── TAB 1: ASISTENCIA GENERAL ───────────────────────────────────────────────
 function renderTab1(data) {
   // Universo de trabajadores en el período filtrado (excluimos descansos puros sin turno)
-  const allNombres = [...new Set(data.map(r => get(r, C.NOMBRES)).filter(Boolean))];
+  const allNombres = [...new Set(data.map(r => r._nombre).filter(Boolean))];
   const total = allNombres.length;
 
   // Filas de trabajo (turno con horas, sin descanso)
@@ -839,8 +840,8 @@ function renderTab1(data) {
   const justRows   = inasistRows.filter(esJustificado);
   const injustRows = inasistRows.filter(r => !esJustificado(r));
 
-  const asistPersonas  = [...new Set(asistRows.map(r => get(r, C.NOMBRES)))];
-  const inasistPersonas = [...new Set(inasistRows.map(r => get(r, C.NOMBRES)))];
+  const asistPersonas  = [...new Set(asistRows.map(r => r._nombre))];
+  const inasistPersonas = [...new Set(inasistRows.map(r => r._nombre))];
 
   // % inasistencias = dias_inasist / (trabajadores * dias_laborables)
   const diasLaborables = [...new Set(
@@ -871,11 +872,11 @@ function renderTab1(data) {
   set('kpi-horas-extra',     minutesToHHMM(heaMins));
 
   // ── Tabla asistieron (únicos)
-  const uniqAsist = [...new Set(asistRows.map(r => get(r, C.NOMBRES)))].sort();
+  const uniqAsist = [...new Set(asistRows.map(r => r._nombre))].sort();
   set('badge-asist', uniqAsist.length);
   tbl('tbl-asistieron', uniqAsist.length
     ? uniqAsist.map(n => {
-        const cargo = get(asistRows.find(r => get(r,C.NOMBRES)===n)||[], C.CARGO) || '–';
+        const cargo = get(asistRows.find(r => r._nombre===n)||[], C.CARGO) || '–';
         return `<tr><td>${n}</td><td><span class="badge badge-gray">${cargo}</span></td></tr>`;
       }).join('')
     : empty(2));
@@ -883,7 +884,7 @@ function renderTab1(data) {
   // ── Tabla no asistieron (únicos, con permiso)
   const noAsistMap = {};
   inasistRows.forEach(row => {
-    const n = get(row, C.NOMBRES);
+    const n = row._nombre;
     if (!noAsistMap[n]) noAsistMap[n] = { permiso: get(row,C.PERMISO)||'–', cargo: get(row,C.CARGO)||'–' };
   });
   set('badge-no-asist', Object.keys(noAsistMap).length);
@@ -895,7 +896,7 @@ function renderTab1(data) {
 
   // ── Top 10 injustificadas
   const injCount = {};
-  injustRows.forEach(row => { const n=get(row,C.NOMBRES); injCount[n]=(injCount[n]||0)+1; });
+  injustRows.forEach(row => { const n=row._nombre; injCount[n]=(injCount[n]||0)+1; });
   const top10inj = Object.entries(injCount).sort((a,b)=>b[1]-a[1]).slice(0,10);
   const totalInj = Object.values(injCount).reduce((a,b)=>a+b,0);
   set('badge-top-inj', totalInj);
@@ -907,7 +908,7 @@ function renderTab1(data) {
   // ── Tabla justificadas
   const justCount = {};
   justRows.forEach(row => {
-    const n = get(row, C.NOMBRES);
+    const n = row._nombre;
     if (!justCount[n]) justCount[n] = { permiso: get(row,C.PERMISO), count:0 };
     justCount[n].count++;
   });
@@ -986,7 +987,7 @@ function renderTab2(data) {
   // ── Top 10 llegadas tarde
   const tardePP = {};
   retardosRows.forEach(row => {
-    const n = get(row, C.NOMBRES);
+    const n = row._nombre;
     if (!tardePP[n]) tardePP[n] = {count:0, mins:0};
     tardePP[n].count++;
     tardePP[n].mins += timeToMinutes(get(row, C.ATRASO1));
@@ -1020,14 +1021,14 @@ function renderTab3(data) {
   // Último descanso por trabajador dentro del período filtrado
   const lastDesc = {}, cargoMap = {};
   data.forEach(row => {
-    const n = get(row, C.NOMBRES); if (!n) return;
+    const n = row._nombre; if (!n) return;
     cargoMap[n] = get(row, C.CARGO) || cargoMap[n] || '–';
     if (esDescanso(row) && row._date) {
       if (!lastDesc[n] || row._date > lastDesc[n]) lastDesc[n] = row._date;
     }
   });
 
-  const allW = [...new Set(data.map(r=>get(r,C.NOMBRES)).filter(Boolean))].sort();
+  const allW = [...new Set(data.map(r=>r._nombre).filter(Boolean))].sort();
   let rojo=0, amarillo=0, verde=0;
 
   const rows = allW.map(n => {
