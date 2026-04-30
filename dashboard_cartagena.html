@@ -621,6 +621,8 @@ function parseCSV(text) {
     }
     obj[key] = (vals[i] || '').trim();
   });
+    console.log(rawData[0]);
+
     return obj;
   });
 }
@@ -805,7 +807,6 @@ function renderTab1(data) {
     .find(v => v && v !== '00:00') || '';
     return entro && entro !== '' && !descanso(r);
   });
-  console.log(rawData[0]);
   const asistPersonas = [...new Set(asistRows.map(r => r.Nombres))];
 
   // Inasistencias: turno=Descanso is a rest day (not absence). 
