@@ -733,18 +733,13 @@ async function loadData() {
     const procRows = parseCSVObj(csv2);
     procMap = {};
     procRows.forEach(r => {
-      const k = (r.Nombres || r.nombres || '').trim().toUpperCase();
+      const k = (r.Nombres || r.nombres || '').trim();
       if (k) procMap[k] = (r.Proceso || r.proceso || '').trim();
     });
     rawData.forEach(row => {
-      // Normalizar clave: intentar Nombres solo, luego Nombres+Apellidos, luego Apellidos+Nombres
-      const nombres   = get(row, C.NOMBRES).trim().toUpperCase();
-      const apellidos = get(row, C.APELLIDOS).trim().toUpperCase();
-      row._proceso =
-        procMap[nombres] ||
-        procMap[(nombres + ' ' + apellidos).trim()] ||
-        procMap[(apellidos + ' ' + nombres).trim()] ||
-        '';
+      // Clave = Nombres + Apellidos, tal como viene del sheet (sin alterar mayúsculas)
+      const keyProc = (get(row, C.NOMBRES) + ' ' + get(row, C.APELLIDOS)).trim();
+      row._proceso = procMap[keyProc] || '';
     });
 
     buildFilters();
@@ -770,7 +765,7 @@ function buildFilters() {
   const turnosMap = {}; // label → raw value original
   turnosRaw.forEach(t => { turnosMap[turnoLabel(t)] = t; });
   const turnoLabels = Object.keys(turnosMap).sort();
-  const procs = [...new Set(rawData.map(r => r._proceso).filter(Boolean))].sort();
+  const procsSet = [...new Set(rawData.map(r => r._proceso || '(Sin proceso)'))].sort();
 
   populate('f-anio',   anios,  anios[anios.length-1]);
   populate('f-mes',    meses.map(m => ({val:m, label:MESES[m]||m})), meses[meses.length-1]);
@@ -779,7 +774,7 @@ function buildFilters() {
   // Para turno, guardamos el valor raw en el option pero mostramos label limpio
   const turnoOpts = ['',...turnoLabels].map(l => ({val: l ? turnosMap[l] : '', label: l || 'Todos'}));
   populate('f-turno',  turnoOpts, '');
-  populate('f-proceso',['',...procs], '');
+  populate('f-proceso',['',...procsSet], '');
 
   ['f-anio','f-mes','f-dia','f-nombre','f-turno','f-proceso'].forEach(id => {
     document.getElementById(id).addEventListener('change', renderAll);
@@ -819,7 +814,7 @@ function applyFilters() {
     if (f.dia     && row._dia  !== f.dia)  return false;
     if (f.nombre  && get(row, C.NOMBRES) !== f.nombre) return false;
     if (f.turno   && get(row, C.TURNO)   !== f.turno)  return false;
-    if (f.proceso && row._proceso !== f.proceso) return false;
+    if (f.proceso && (row._proceso || '(Sin proceso)') !== f.proceso) return false;
     return true;
   });
 }
