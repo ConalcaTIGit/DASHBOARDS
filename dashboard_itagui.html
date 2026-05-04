@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indicador de Asistencias – ITAGUI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap');
+
+  :root {
+    --naranja: #F47920;
+    --naranja-dark: #C85F0A;
+    --naranja-light: #FFF0E5;
+    --gris-bg: #F4F5F7;
+    --gris-card: #FFFFFF;
+    --gris-borde: #E2E5EA;
+    --gris-texto: #4A5568;
+    --gris-sub: #718096;
+    --negro: #1A202C;
+    --rojo: #E53E3E;
+    --rojo-bg: #FFF5F5;
+    --verde: #38A169;
+    --verde-bg: #F0FFF4;
+    --amarillo: #D69E2E;
+    --amarillo-bg: #FFFFF0;
+    --azul: #3182CE;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: var(--gris-bg);
+    color: var(--negro);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--negro);
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 58px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .logo-circle {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--naranja), #F9A825);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800; color: white;
+    flex-shrink: 0;
+  }
+  .header-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px; font-weight: 700;
+    color: white;
+    letter-spacing: 0.5px;
+  }
+  .header-title span { color: var(--naranja); }
+  .header-right {
+    display: flex; align-items: center; gap: 12px;
+  }
+  #last-update {
+    font-size: 12px; color: #A0AEC0;
+  }
+  #btn-refresh {
+    background: var(--naranja);
+    border: none; color: white;
+    padding: 7px 16px; border-radius: 6px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: background 0.2s;
+  }
+  #btn-refresh:hover { background: var(--naranja-dark); }
+  #btn-refresh:disabled { opacity: 0.6; cursor: default; }
+
+  /* ── LOADING ── */
+  #loading-overlay {
+    position: fixed; inset: 0; background: rgba(26,32,44,0.85);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 999; gap: 20px;
+  }
+  #loading-overlay.hidden { display: none; }
+  .spinner {
+    width: 48px; height: 48px;
+    border: 4px solid rgba(244,121,32,0.3);
+    border-top-color: var(--naranja);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { color: white; font-size: 15px; font-weight: 500; }
+
+  /* ── FILTERS ── */
+  #filter-bar {
+    background: white;
+    border-bottom: 2px solid var(--naranja);
+    padding: 12px 28px;
+    display: flex; flex-wrap: wrap; gap: 12px;
+    align-items: center;
+  }
+  .filter-group {
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .filter-group label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+    text-transform: uppercase; color: var(--gris-sub);
+  }
+  .filter-group select {
+    border: 1.5px solid var(--gris-borde);
+    border-radius: 6px; padding: 5px 28px 5px 10px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px; font-weight: 500; color: var(--negro);
+    background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23718096'/%3E%3C/svg%3E") no-repeat right 10px center;
+    -webkit-appearance: none; appearance: none;
+    cursor: pointer; min-width: 130px;
+  }
+  .filter-group select:focus {
+    outline: none; border-color: var(--naranja);
+  }
+  #filter-nombre {
+    min-width: 200px;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    padding: 20px 28px 32px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  /* ── PAGE TABS ── */
+  .page-tabs {
+    display: flex; gap: 4px; margin-bottom: 18px;
+  }
+  .tab-btn {
+    padding: 8px 20px; border-radius: 8px 8px 0 0;
+    border: none; cursor: pointer;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px; font-weight: 600;
+    background: #DDE1E7; color: var(--gris-sub);
+    transition: all 0.18s;
+  }
+  .tab-btn.active {
+    background: var(--naranja); color: white;
+  }
+  .tab-btn:hover:not(.active) { background: #C8CDD6; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── KPI CARDS ── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .kpi-card {
+    background: white;
+    border-radius: 10px;
+    padding: 16px 18px;
+    border: 1.5px solid var(--gris-borde);
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+  }
+  .kpi-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .kpi-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; background: var(--naranja);
+  }
+  .kpi-label {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.7px;
+    color: var(--gris-sub); margin-bottom: 6px;
+  }
+  .kpi-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 36px; font-weight: 700; line-height: 1;
+    color: var(--negro);
+  }
+  .kpi-value.orange { color: var(--naranja); }
+  .kpi-value.red { color: var(--rojo); }
+  .kpi-value.green { color: var(--verde); }
+
+  /* ── GRID LAYOUT ── */
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .span-2 { grid-column: span 2; }
+
+  /* ── PANEL ── */
+  .panel {
+    background: white;
+    border-radius: 10px;
+    border: 1.5px solid var(--gris-borde);
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 12px 16px;
+    border-bottom: 1.5px solid var(--gris-borde);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-title {
+    font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--negro);
+  }
+  .panel-badge {
+    background: var(--naranja-light); color: var(--naranja-dark);
+    font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 20px;
+  }
+  .panel-body { padding: 0; }
+
+  /* ── TABLES ── */
+  .data-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  .data-table th {
+    background: #F7F8FA;
+    padding: 8px 12px; text-align: left;
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--gris-sub);
+    border-bottom: 1.5px solid var(--gris-borde);
+    position: sticky; top: 0;
+  }
+  .data-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #F0F2F5;
+    color: var(--negro);
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: #FAFBFC; }
+
+  .table-scroll { max-height: 280px; overflow-y: auto; }
+  .table-scroll-lg { max-height: 360px; overflow-y: auto; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .badge-red { background: var(--rojo-bg); color: var(--rojo); }
+  .badge-green { background: var(--verde-bg); color: var(--verde); }
+  .badge-orange { background: var(--naranja-light); color: var(--naranja-dark); }
+  .badge-gray { background: #EDF2F7; color: #4A5568; }
+  .badge-yellow { background: var(--amarillo-bg); color: var(--amarillo); }
+
+  /* ── CHARTS ── */
+  .chart-container {
+    padding: 12px 16px 16px;
+    position: relative;
+  }
+  .chart-container canvas { max-height: 220px; }
+  .chart-container-sm canvas { max-height: 160px; }
+
+  /* ── SEMAFORO ── */
+  .semaforo {
+    width: 10px; height: 10px; border-radius: 50%;
+    display: inline-block; margin-right: 6px; flex-shrink: 0;
+  }
+  .sem-verde { background: var(--verde); }
+  .sem-amarillo { background: var(--amarillo); }
+  .sem-rojo { background: var(--rojo); box-shadow: 0 0 0 3px rgba(229,62,62,0.15); }
+
+  .dias-badge {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700;
+  }
+  .dias-ok { background: var(--verde-bg); color: var(--verde); }
+  .dias-warn { background: var(--amarillo-bg); color: var(--amarillo); }
+  .dias-alert { background: var(--rojo-bg); color: var(--rojo); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center; padding: 32px 16px;
+    color: var(--gris-sub); font-size: 13px;
+  }
+
+  /* ── ERROR BANNER ── */
+  #error-banner {
+    background: #FFF5F5; border: 1.5px solid #FC8181;
+    border-radius: 8px; padding: 12px 16px;
+    margin-bottom: 16px; color: var(--rojo);
+    font-size: 13px; font-weight: 500;
+    display: none;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .grid-3 { grid-template-columns: 1fr 1fr; }
+    .span-2 { grid-column: span 1; }
+    main { padding: 14px 14px 28px; }
+  }
+  @media (max-width: 600px) {
+    .grid-3, .grid-2 { grid-template-columns: 1fr; }
+    .kpi-row { grid-template-columns: 1fr 1fr; }
+    header { padding: 0 14px; }
+    .header-title { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Cargando datos desde Google Sheets…</div>
+</div>
+
+<header>
+  <div class="header-left">
+    <div class="logo-circle">C</div>
+    <div class="header-title">Indicador de Asistencias – <span>CARTAGENA</span></div>
+  </div>
+  <div class="header-right">
+    <span id="last-update"></span>
+    <button id="btn-refresh" onclick="loadData()">↻ Actualizar</button>
+  </div>
+</header>
+
+<div id="filter-bar">
+  <div class="filter-group">
+    <label>Año</label>
+    <select id="f-anio"></select>
+  </div>
+  <div class="filter-group">
+    <label>Mes</label>
+    <select id="f-mes"></select>
+  </div>
+  <div class="filter-group">
+    <label>Día</label>
+    <select id="f-dia"></select>
+  </div>
+  <div class="filter-group">
+    <label>Nombre</label>
+    <select id="f-nombre" style="min-width:200px"></select>
+  </div>
+  <div class="filter-group">
+    <label>Turno</label>
+    <select id="f-turno"></select>
+  </div>
+  <div class="filter-group">
+    <label>Proceso</label>
+    <select id="f-proceso"></select>
+  </div>
+</div>
+
+<main>
+  <div id="error-banner"></div>
+
+  <div class="page-tabs">
+    <button class="tab-btn active" onclick="switchTab('tab1', this)">Asistencia General</button>
+    <button class="tab-btn" onclick="switchTab('tab2', this)">Retardos & Salidas</button>
+    <button class="tab-btn" onclick="switchTab('tab3', this)">Descansos</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       TAB 1: ASISTENCIA GENERAL
+  ═══════════════════════════════════════════ -->
+  <div id="tab1" class="tab-content active">
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Trabajadores</div>
+        <div class="kpi-value orange" id="kpi-total">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Asistieron</div>
+        <div class="kpi-value green" id="kpi-asistieron">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">No Asistieron</div>
+        <div class="kpi-value red" id="kpi-no-asistieron">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">% Inasistencias</div>
+        <div class="kpi-value orange" id="kpi-pct-inasist">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Tiempo Medio Trabajado</div>
+        <div class="kpi-value" id="kpi-tiempo-medio">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Horas Extra (HEA)</div>
+        <div class="kpi-value" id="kpi-horas-extra">–</div>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <!-- Asistieron -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Asistieron</span>
+          <span class="panel-badge" id="badge-asist">0</span>
+        </div>
+        <div class="panel-body table-scroll">
+          <table class="data-table">
+            <thead><tr><th>Nombre</th><th>Cargo</th></tr></thead>
+            <tbody id="tbl-asistieron"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Top 10 inasistencias no justificadas -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Top 10: Inasistencias No Justificadas</span>
+          <span class="panel-badge" id="badge-top-inj">0</span>
+        </div>
+        <div class="panel-body table-scroll">
+          <table class="data-table">
+            <thead><tr><th>Nombre</th><th style="text-align:right">Cant.</th></tr></thead>
+            <tbody id="tbl-top-injustif"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- KPIs derecha + chart inasistencias -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Inasistencias Injustificadas – Evolución</span></div>
+          <div class="chart-container chart-container-sm">
+            <canvas id="chart-inasist-evol"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- No asistieron -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">No Asistieron</span>
+          <span class="panel-badge" id="badge-no-asist">0</span>
+        </div>
+        <div class="panel-body table-scroll">
+          <table class="data-table">
+            <thead><tr><th>Nombre</th><th>Permiso</th><th>Cargo</th></tr></thead>
+            <tbody id="tbl-no-asistieron"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Inasistencias justificadas -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Inasistencias Justificadas</span>
+          <span class="panel-badge" id="badge-justif">0</span>
+        </div>
+        <div class="panel-body table-scroll">
+          <table class="data-table">
+            <thead><tr><th>Nombre</th><th>Permiso</th><th style="text-align:right">#</th></tr></thead>
+            <tbody id="tbl-justificadas"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       TAB 2: RETARDOS & SALIDAS TEMPRANO
+  ═══════════════════════════════════════════ -->
+  <div id="tab2" class="tab-content">
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Retardos</div>
+        <div class="kpi-value red" id="kpi-retardos">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Salidas Temprano</div>
+        <div class="kpi-value orange" id="kpi-salidas">–</div>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <!-- Inasistencias por proceso -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Inasistencias por Proceso</span></div>
+        <div class="chart-container"><canvas id="chart-por-proceso"></canvas></div>
+        <div class="panel-body table-scroll" style="border-top:1.5px solid var(--gris-borde)">
+          <table class="data-table">
+            <thead><tr><th>Proceso</th><th style="text-align:right">Cant.</th></tr></thead>
+            <tbody id="tbl-por-proceso"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Inasistencias por cargo -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Inasistencias por Cargo</span></div>
+        <div class="chart-container"><canvas id="chart-por-cargo"></canvas></div>
+        <div class="panel-body table-scroll" style="border-top:1.5px solid var(--gris-borde)">
+          <table class="data-table">
+            <thead><tr><th>Cargo</th><th style="text-align:right">Cant.</th></tr></thead>
+            <tbody id="tbl-por-cargo"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Top 10 empleados llegadas tarde -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Top 10: Llegadas Tarde</span></div>
+          <div class="panel-body table-scroll-lg">
+            <table class="data-table">
+              <thead><tr><th>Nombre</th><th style="text-align:right">Días</th><th style="text-align:right">Tiempo Ac.</th></tr></thead>
+              <tbody id="tbl-top-tarde"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Llegadas Tarde – Evolución</span></div>
+          <div class="chart-container chart-container-sm"><canvas id="chart-tarde-evol"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       TAB 3: SEMÁFORO DE DESCANSOS
+  ═══════════════════════════════════════════ -->
+  <div id="tab3" class="tab-content">
+    <div style="background:white;border-radius:10px;border:1.5px solid var(--gris-borde);padding:14px 18px;margin-bottom:16px;font-size:13px;line-height:1.6;color:var(--gris-texto)">
+      <strong style="color:var(--negro)">¿Cómo funciona este semáforo?</strong><br>
+      Muestra el último día de descanso registrado por trabajador en el período filtrado.
+      <span class="semaforo sem-verde" style="margin-left:10px"></span><strong>Verde</strong>: ≤ 6 días sin descanso &nbsp;
+      <span class="semaforo sem-amarillo"></span><strong>Amarillo</strong>: 7 días &nbsp;
+      <span class="semaforo sem-rojo"></span><strong>Rojo</strong>: &gt; 7 días — requiere atención.
+    </div>
+
+    <div class="kpi-row" style="grid-template-columns:repeat(3,1fr);max-width:500px">
+      <div class="kpi-card">
+        <div class="kpi-label">En alerta 🔴</div>
+        <div class="kpi-value red" id="kpi-sem-rojo">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Advertencia 🟡</div>
+        <div class="kpi-value" style="color:var(--amarillo)" id="kpi-sem-amarillo">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Al día 🟢</div>
+        <div class="kpi-value green" id="kpi-sem-verde">–</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Último día de descanso por trabajador</span>
+        <span class="panel-badge" id="badge-descansos">0</span>
+      </div>
+      <div class="panel-body table-scroll-lg">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Cargo</th>
+              <th>Último Descanso</th>
+              <th>Días sin descanso</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-descansos"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ─── URLS ────────────────────────────────────────────────────────────────────
+const URL_ASIST = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTO6s7dfqRPyuzhLou-LCwRDgP-XH7JxKaAI78A--fzRxAhWTS7fGsDq-45oVLybaOQa3K7ufN68onS/pub?gid=0&single=true&output=csv";
+const URL_PROC  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTO6s7dfqRPyuzhLou-LCwRDgP-XH7JxKaAI78A--fzRxAhWTS7fGsDq-45oVLybaOQa3K7ufN68onS/pub?gid=1030548868&single=true&output=csv";
+
+// ─── COLUMN INDICES (fijos por posición, no por nombre) ──────────────────────
+// 0:Apellidos 1:Nombres 2:Identificador 3:Grupo 4:Fecha 5:Permiso 6:Turno
+// 7:Entró1 8:Atraso1 9:Salió1 10:Entró2 11:Atraso2 12:Salió2 13:Adelanto
+// 14:HEA 15:HEC 16:HT 17:HNT 18:HP ... 49:Cargo
+const C = {
+  APELLIDOS:0, NOMBRES:1, ID:2, GRUPO:3, FECHA:4, PERMISO:5, TURNO:6,
+  ENTRO1:7, ATRASO1:8, SALIO1:9, ENTRO2:10, ATRASO2:11, SALIO2:12, ADELANTO:13,
+  HEA:14, HEC:15, HT:16, HNT:17, HP:18, CARGO:49
+};
+
+// ─── GLOBALS ─────────────────────────────────────────────────────────────────
+let rawData = [];   // array of arrays (rows by index)
+let procMap = {};   // NOMBRE_UPPER → proceso
+let charts = {};
+const MESES = {'01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio',
+               '07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'};
+
+// ─── CSV PARSER — devuelve arrays de arrays ───────────────────────────────────
+function parseCSVRaw(text) {
+  const lines = text.replace(/\r/g,'').split('\n');
+  return lines.map(line => splitCSVLine(line));
+}
+
+function splitCSVLine(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+// Para tabla de procesos (solo 2 columnas, sin duplicados)
+function parseCSVObj(text) {
+  const rows = parseCSVRaw(text).filter(r => r.some(v => v));
+  if (!rows.length) return [];
+  const headers = rows[0];
+  return rows.slice(1).map(vals => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = vals[i] || '');
+    return obj;
+  });
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function get(row, col) { return (row[col] || '').trim(); }
+
+// Date: "lun 20-04-2026" → Date
+function parseDate(str) {
+  if (!str) return null;
+  const m = str.match(/(\d{2})-(\d{2})-(\d{4})/);
+  if (!m) return null;
+  return new Date(+m[3], +m[2]-1, +m[1]);
+}
+function fmtDate(d) {
+  if (!d) return '–';
+  return d.toLocaleDateString('es-CO', {day:'2-digit', month:'short', year:'numeric'});
+}
+
+// "14:00 - 22:00  Sin descanso " → "14:00 - 22:00"
+function turnoLabel(raw) {
+  if (!raw) return '';
+  if (raw.trim() === 'Descanso') return 'Descanso';
+  // Extrae solo la parte HH:MM - HH:MM o HH:MM:SS hrs.
+  const m = raw.match(/(\d{2}:\d{2}(?::\d{2})?\s*-\s*\d{2}:\d{2}(?::\d{2})?|\d+:\d{2}:\d{2}\s*hrs\.)/);
+  return m ? m[1].trim() : raw.trim();
+}
+
+function timeToMinutes(t) {
+  if (!t || t === '00:00') return 0;
+  const parts = t.split(':');
+  return parseInt(parts[0]||0)*60 + parseInt(parts[1]||0);
+}
+function minutesToHHMM(mins) {
+  if (!mins) return '0:00';
+  const h = Math.floor(Math.abs(mins)/60);
+  const m = String(Math.abs(mins)%60).padStart(2,'0');
+  return `${h}:${m}`;
+}
+
+// ─── ROW CLASSIFICATION ───────────────────────────────────────────────────────
+// Descanso = turno es literalmente "Descanso"
+const esDescanso  = row => get(row, C.TURNO) === 'Descanso';
+// Trabajó = tiene turno con horas Y tiene entrada registrada (col 7 o 10)
+const trabajó     = row => !esDescanso(row) && (get(row, C.ENTRO1) !== '' || get(row, C.ENTRO2) !== '');
+// Inasistencia = tiene turno con horas PERO no tiene entrada
+const inasistente = row => !esDescanso(row) && get(row, C.ENTRO1) === '' && get(row, C.ENTRO2) === '' && get(row, C.TURNO) !== '';
+// Justificado = inasistente con permiso distinto de Ninguno/vacío
+const justificadoPermisos = new Set(['Incapacidad','Remunerada','Vacaciones','Retiro Sizing','INGRESO NO ACTIVO A LA FECHA']);
+const esJustificado = row => {
+  const p = get(row, C.PERMISO);
+  return p && p !== 'Ninguno' && p !== '';
+};
+// Retardo = Atraso1 > 00:00
+const tieneRetardo = row => { const a = get(row, C.ATRASO1); return a && a !== '00:00'; };
+// Salida temprana = Adelanto > 00:00
+const tieneSalidaTemprana = row => { const a = get(row, C.ADELANTO); return a && a !== '00:00'; };
+
+// ─── LOAD DATA ────────────────────────────────────────────────────────────────
+async function loadData() {
+  showLoading(true); hideError();
+  document.getElementById('btn-refresh').disabled = true;
+  try {
+    const [r1, r2] = await Promise.all([
+      fetch(URL_ASIST + '&_=' + Date.now()),
+      fetch(URL_PROC  + '&_=' + Date.now())
+    ]);
+    if (!r1.ok) throw new Error('HTTP ' + r1.status + ' al leer sheet principal');
+    if (!r2.ok) throw new Error('HTTP ' + r2.status + ' al leer sheet de procesos');
+    const [csv1, csv2] = await Promise.all([r1.text(), r2.text()]);
+
+    // Leer asistencia como array-de-arrays, saltar header (fila 0)
+    const allRows = parseCSVRaw(csv1);
+    rawData = allRows.slice(1).filter(row => {
+      const n = get(row, C.NOMBRES);
+      return n !== '';  // solo filas con nombre
+    });
+
+    // Enriquecer cada fila con campos calculados
+    rawData.forEach(row => {
+      const d = parseDate(get(row, C.FECHA));
+      row._date  = d;
+      row._anio  = d ? String(d.getFullYear()) : '?';
+      row._mes   = d ? String(d.getMonth()+1).padStart(2,'0') : '??';
+      row._dia   = d ? String(d.getDate()).padStart(2,'0') : '??';
+      row._turnoLabel = turnoLabel(get(row, C.TURNO));
+      // Nombre completo = Nombres + Apellidos, siempre en mayúsculas
+      row._nombre = (get(row, C.NOMBRES) + ' ' + get(row, C.APELLIDOS)).trim().toUpperCase();
+    });
+
+    // Procesos
+    const procRows = parseCSVObj(csv2);
+    procMap = {};
+    procRows.forEach(r => {
+      const k = (r.Nombres || r.nombres || '').trim().toUpperCase();
+      if (k) procMap[k] = (r.Proceso || r.proceso || '').trim();
+    });
+    rawData.forEach(row => {
+      // Clave = Nombres + Apellidos en MAYÚSCULAS → match con procesos
+      row._proceso = procMap[row._nombre] || '';
+    });
+
+    buildFilters();
+    renderAll();
+    document.getElementById('last-update').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-CO');
+  } catch(e) {
+    showError('Error al cargar datos: ' + e.message + '. Verifica que el sheet esté publicado como CSV.');
+    console.error(e);
+  } finally {
+    showLoading(false);
+    document.getElementById('btn-refresh').disabled = false;
+  }
+}
+
+// ─── FILTERS ─────────────────────────────────────────────────────────────────
+function buildFilters() {
+  const anios   = [...new Set(rawData.map(r => r._anio))].filter(Boolean).sort();
+  const meses   = [...new Set(rawData.map(r => r._mes))].filter(Boolean).sort();
+  const dias    = [...new Set(rawData.map(r => r._dia))].filter(v=>v&&v!=='??').sort((a,b)=>+a-+b);
+  const nombres = [...new Set(rawData.map(r => r._nombre))].filter(Boolean).sort();
+  // Turno: solo los que NO son Descanso, con label limpio
+  const turnosRaw = [...new Set(rawData.map(r => get(r, C.TURNO)).filter(t => t && t !== 'Descanso'))];
+  const turnosMap = {}; // label → raw value original
+  turnosRaw.forEach(t => { turnosMap[turnoLabel(t)] = t; });
+  const turnoLabels = Object.keys(turnosMap).sort();
+  const procsSet = [...new Set(rawData.map(r => r._proceso || '(Sin proceso)'))].sort();
+
+  populate('f-anio',   anios,  anios[anios.length-1]);
+  populate('f-mes',    meses.map(m => ({val:m, label:MESES[m]||m})), meses[meses.length-1]);
+  populate('f-dia',    ['',...dias], '');
+  populate('f-nombre', ['',...nombres], '');
+  // Para turno, guardamos el valor raw en el option pero mostramos label limpio
+  const turnoOpts = ['',...turnoLabels].map(l => ({val: l ? turnosMap[l] : '', label: l || 'Todos'}));
+  populate('f-turno',  turnoOpts, '');
+  populate('f-proceso',['',...procsSet], '');
+
+  ['f-anio','f-mes','f-dia','f-nombre','f-turno','f-proceso'].forEach(id => {
+    document.getElementById(id).addEventListener('change', renderAll);
+  });
+}
+
+function populate(id, items, selected) {
+  const sel = document.getElementById(id);
+  const prev = sel.value;
+  sel.innerHTML = '';
+  items.forEach(item => {
+    const v = typeof item === 'object' ? item.val : item;
+    const l = typeof item === 'object' ? item.label : (v || 'Todos');
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = l || 'Todos';
+    if (v === (prev !== '' ? prev : selected)) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function getFilters() {
+  return {
+    anio:    document.getElementById('f-anio').value,
+    mes:     document.getElementById('f-mes').value,
+    dia:     document.getElementById('f-dia').value,
+    nombre:  document.getElementById('f-nombre').value,
+    turno:   document.getElementById('f-turno').value,
+    proceso: document.getElementById('f-proceso').value,
+  };
+}
+
+function applyFilters() {
+  const f = getFilters();
+  return rawData.filter(row => {
+    if (f.anio    && row._anio !== f.anio) return false;
+    if (f.mes     && row._mes  !== f.mes)  return false;
+    if (f.dia     && row._dia  !== f.dia)  return false;
+    if (f.nombre  && row._nombre !== f.nombre) return false;
+    if (f.turno   && get(row, C.TURNO)   !== f.turno)  return false;
+    if (f.proceso && (row._proceso || '(Sin proceso)') !== f.proceso) return false;
+    return true;
+  });
+}
+
+// ─── MAIN RENDER ─────────────────────────────────────────────────────────────
+function renderAll() {
+  const data = applyFilters();
+  renderTab1(data);
+  renderTab2(data);
+  renderTab3(data);
+}
+
+// ─── TAB 1: ASISTENCIA GENERAL ───────────────────────────────────────────────
+function renderTab1(data) {
+  // Universo de trabajadores en el período filtrado (excluimos descansos puros sin turno)
+  const allNombres = [...new Set(data.map(r => r._nombre).filter(Boolean))];
+  const total = allNombres.length;
+
+  // Filas de trabajo (turno con horas, sin descanso)
+  const asistRows  = data.filter(trabajó);
+  const inasistRows = data.filter(inasistente);
+  const justRows   = inasistRows.filter(esJustificado);
+  const injustRows = inasistRows.filter(r => !esJustificado(r));
+
+  const asistPersonas  = [...new Set(asistRows.map(r => r._nombre))];
+  const inasistPersonas = [...new Set(inasistRows.map(r => r._nombre))];
+
+  // % inasistencias = dias_inasist / (trabajadores * dias_laborables)
+  const diasLaborables = [...new Set(
+    data.filter(r => !esDescanso(r) && get(r,C.TURNO)).map(r => get(r, C.FECHA))
+  )].length;
+  const pctInasist = (total > 0 && diasLaborables > 0)
+    ? ((injustRows.length / (total * diasLaborables)) * 100).toFixed(2)
+    : '0.00';
+
+  // Tiempo medio trabajado (HT col 16)
+  let totalMins = 0, countHT = 0;
+  data.forEach(row => {
+    const mins = timeToMinutes(get(row, C.HT));
+    if (mins > 0) { totalMins += mins; countHT++; }
+  });
+  const medioMins = countHT > 0 ? Math.round(totalMins / countHT) : 0;
+
+  // Horas extra (HEA col 14)
+  let heaMins = 0;
+  data.forEach(row => { heaMins += timeToMinutes(get(row, C.HEA)); });
+
+  // ── KPIs
+  set('kpi-total',           total.toLocaleString('es-CO'));
+  set('kpi-asistieron',      asistPersonas.length.toLocaleString('es-CO'));
+  set('kpi-no-asistieron',   inasistPersonas.length.toLocaleString('es-CO'));
+  set('kpi-pct-inasist',     pctInasist + ' %');
+  set('kpi-tiempo-medio',    minutesToHHMM(medioMins));
+  set('kpi-horas-extra',     minutesToHHMM(heaMins));
+
+  // ── Tabla asistieron (únicos)
+  const uniqAsist = [...new Set(asistRows.map(r => r._nombre))].sort();
+  set('badge-asist', uniqAsist.length);
+  tbl('tbl-asistieron', uniqAsist.length
+    ? uniqAsist.map(n => {
+        const cargo = get(asistRows.find(r => r._nombre===n)||[], C.CARGO) || '–';
+        return `<tr><td>${n}</td><td><span class="badge badge-gray">${cargo}</span></td></tr>`;
+      }).join('')
+    : empty(2));
+
+  // ── Tabla no asistieron (únicos, con permiso)
+  const noAsistMap = {};
+  inasistRows.forEach(row => {
+    const n = row._nombre;
+    if (!noAsistMap[n]) noAsistMap[n] = { permiso: get(row,C.PERMISO)||'–', cargo: get(row,C.CARGO)||'–' };
+  });
+  set('badge-no-asist', Object.keys(noAsistMap).length);
+  tbl('tbl-no-asistieron', Object.keys(noAsistMap).length
+    ? Object.entries(noAsistMap).sort(([a],[b])=>a.localeCompare(b)).map(([n,v])=>
+        `<tr><td>${n}</td><td><span class="badge badge-orange">${v.permiso}</span></td><td>${v.cargo}</td></tr>`
+      ).join('')
+    : empty(3));
+
+  // ── Top 10 injustificadas
+  const injCount = {};
+  injustRows.forEach(row => { const n=row._nombre; injCount[n]=(injCount[n]||0)+1; });
+  const top10inj = Object.entries(injCount).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const totalInj = Object.values(injCount).reduce((a,b)=>a+b,0);
+  set('badge-top-inj', totalInj);
+  tbl('tbl-top-injustif', top10inj.length
+    ? top10inj.map(([n,c])=>`<tr><td>${n}</td><td style="text-align:right"><span class="badge badge-red">${c}</span></td></tr>`).join('')
+      + `<tr style="font-weight:700"><td>Total</td><td style="text-align:right">${totalInj}</td></tr>`
+    : empty(2,'Sin inasistencias injustificadas'));
+
+  // ── Tabla justificadas
+  const justCount = {};
+  justRows.forEach(row => {
+    const n = row._nombre;
+    if (!justCount[n]) justCount[n] = { permiso: get(row,C.PERMISO), count:0 };
+    justCount[n].count++;
+  });
+  const sortedJust = Object.entries(justCount).sort((a,b)=>b[1].count-a[1].count);
+  const totalJust  = sortedJust.reduce((a,[,v])=>a+v.count,0);
+  set('badge-justif', totalJust);
+  tbl('tbl-justificadas', sortedJust.length
+    ? sortedJust.map(([n,v])=>`<tr><td>${n}</td><td><span class="badge badge-yellow">${v.permiso}</span></td><td style="text-align:right">${v.count}</td></tr>`).join('')
+      + `<tr style="font-weight:700"><td>Total</td><td></td><td style="text-align:right">${totalJust}</td></tr>`
+    : empty(3,'Sin inasistencias justificadas'));
+
+  // ── Chart: evolución injustificadas por fecha
+  const byDate = {};
+  injustRows.forEach(row => { const f=get(row,C.FECHA); byDate[f]=(byDate[f]||0)+1; });
+  const sortedDates = Object.keys(byDate).sort((a,b)=>{const da=parseDate(a),db=parseDate(b);return da&&db?da-db:0;});
+  destroyChart('chart-inasist-evol');
+  charts['chart-inasist-evol'] = new Chart(document.getElementById('chart-inasist-evol'), {
+    type:'line',
+    data:{ labels: sortedDates.map(d=>{const dt=parseDate(d);return dt?dt.toLocaleDateString('es-CO',{day:'2-digit',month:'short'}):d;}),
+           datasets:[{label:'Inasistencias', data:sortedDates.map(d=>byDate[d]),
+             borderColor:'#F47920', backgroundColor:'rgba(244,121,32,0.12)',
+             tension:0.35, fill:true, pointRadius:3, pointBackgroundColor:'#F47920', borderWidth:2}] },
+    options: chartOpts('Cantidad')
+  });
+}
+
+// ─── TAB 2: RETARDOS & SALIDAS ───────────────────────────────────────────────
+function renderTab2(data) {
+  const retardosRows      = data.filter(tieneRetardo);
+  const salidasTempRows   = data.filter(tieneSalidaTemprana);
+  const inasistRows       = data.filter(inasistente);
+
+  set('kpi-retardos', retardosRows.length.toLocaleString('es-CO'));
+  set('kpi-salidas',  salidasTempRows.length.toLocaleString('es-CO'));
+
+  // ── Inasistencias por proceso
+  const porProceso = {};
+  inasistRows.forEach(row => {
+    const p = row._proceso || '(Sin proceso)';
+    porProceso[p] = (porProceso[p]||0)+1;
+  });
+  const sortedProc  = Object.entries(porProceso).sort((a,b)=>b[1]-a[1]);
+  const totalProc   = sortedProc.reduce((a,[,v])=>a+v,0);
+  tbl('tbl-por-proceso', sortedProc.length
+    ? sortedProc.map(([p,c])=>`<tr><td>${p}</td><td style="text-align:right">${c}</td></tr>`).join('')
+      + `<tr style="font-weight:700"><td>Total</td><td style="text-align:right">${totalProc}</td></tr>`
+    : empty(2));
+  destroyChart('chart-por-proceso');
+  charts['chart-por-proceso'] = new Chart(document.getElementById('chart-por-proceso'), {
+    type:'bar',
+    data:{ labels:sortedProc.map(([p])=>p),
+           datasets:[{label:'Inasistencias', data:sortedProc.map(([,c])=>c), backgroundColor:'#F47920', borderRadius:4}] },
+    options: chartOpts('Cantidad')
+  });
+
+  // ── Inasistencias por cargo
+  const porCargo = {};
+  inasistRows.forEach(row => {
+    const c = get(row, C.CARGO) || '(Sin cargo)';
+    porCargo[c] = (porCargo[c]||0)+1;
+  });
+  const sortedCargo = Object.entries(porCargo).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const totalCargo  = sortedCargo.reduce((a,[,v])=>a+v,0);
+  tbl('tbl-por-cargo', sortedCargo.length
+    ? sortedCargo.map(([c,n])=>`<tr><td>${c}</td><td style="text-align:right">${n}</td></tr>`).join('')
+      + `<tr style="font-weight:700"><td>Total</td><td style="text-align:right">${totalCargo}</td></tr>`
+    : empty(2));
+  destroyChart('chart-por-cargo');
+  charts['chart-por-cargo'] = new Chart(document.getElementById('chart-por-cargo'), {
+    type:'bar',
+    data:{ labels: sortedCargo.map(([c])=>c.length>18?c.slice(0,17)+'…':c),
+           datasets:[{label:'Inasistencias', data:sortedCargo.map(([,n])=>n), backgroundColor:'#F47920', borderRadius:4}] },
+    options: chartOpts('Cantidad', true)
+  });
+
+  // ── Top 10 llegadas tarde
+  const tardePP = {};
+  retardosRows.forEach(row => {
+    const n = row._nombre;
+    if (!tardePP[n]) tardePP[n] = {count:0, mins:0};
+    tardePP[n].count++;
+    tardePP[n].mins += timeToMinutes(get(row, C.ATRASO1));
+  });
+  const top10Tarde = Object.entries(tardePP).sort((a,b)=>b[1].count-a[1].count).slice(0,10);
+  tbl('tbl-top-tarde', top10Tarde.length
+    ? top10Tarde.map(([n,v])=>
+        `<tr><td>${n}</td><td style="text-align:right"><span class="badge badge-orange">${v.count}</span></td><td style="text-align:right">${minutesToHHMM(v.mins)}</td></tr>`
+      ).join('')
+    : empty(3,'Sin retardos'));
+
+  // ── Chart llegadas tarde evolución
+  const tardeByDate = {};
+  retardosRows.forEach(row => { const f=get(row,C.FECHA); tardeByDate[f]=(tardeByDate[f]||0)+1; });
+  const sortedTD = Object.keys(tardeByDate).sort((a,b)=>{const da=parseDate(a),db=parseDate(b);return da&&db?da-db:0;});
+  destroyChart('chart-tarde-evol');
+  charts['chart-tarde-evol'] = new Chart(document.getElementById('chart-tarde-evol'), {
+    type:'line',
+    data:{ labels:sortedTD.map(d=>{const dt=parseDate(d);return dt?dt.toLocaleDateString('es-CO',{day:'2-digit',month:'short'}):d;}),
+           datasets:[{label:'Llegadas tarde', data:sortedTD.map(d=>tardeByDate[d]),
+             borderColor:'#F47920', backgroundColor:'rgba(244,121,32,0.1)',
+             tension:0.35, fill:true, pointRadius:3, pointBackgroundColor:'#F47920', borderWidth:2}] },
+    options: chartOpts('Cantidad')
+  });
+}
+
+// ─── TAB 3: SEMÁFORO DESCANSOS ────────────────────────────────────────────────
+function renderTab3(data) {
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // Último descanso por trabajador dentro del período filtrado
+  const lastDesc = {}, cargoMap = {};
+  data.forEach(row => {
+    const n = row._nombre; if (!n) return;
+    cargoMap[n] = get(row, C.CARGO) || cargoMap[n] || '–';
+    if (esDescanso(row) && row._date) {
+      if (!lastDesc[n] || row._date > lastDesc[n]) lastDesc[n] = row._date;
+    }
+  });
+
+  const allW = [...new Set(data.map(r=>r._nombre).filter(Boolean))].sort();
+  let rojo=0, amarillo=0, verde=0;
+
+  const rows = allW.map(n => {
+    const cargo = cargoMap[n]||'–';
+    const lastD = lastDesc[n];
+    let diasSin, fechaTxt, badge, sem;
+    if (!lastD) {
+      diasSin='–'; fechaTxt='Sin registro';
+      badge=`<span class="dias-badge dias-alert"><span class="semaforo sem-rojo"></span>Sin dato</span>`;
+      sem='rojo'; rojo++;
+    } else {
+      const d = Math.floor((today - lastD)/(1000*60*60*24));
+      diasSin=d; fechaTxt=fmtDate(lastD);
+      if (d>7)      { badge=`<span class="dias-badge dias-alert"><span class="semaforo sem-rojo"></span>${d} días</span>`; sem='rojo'; rojo++; }
+      else if(d===7){ badge=`<span class="dias-badge dias-warn"><span class="semaforo sem-amarillo"></span>${d} días</span>`; sem='amarillo'; amarillo++; }
+      else          { badge=`<span class="dias-badge dias-ok"><span class="semaforo sem-verde"></span>${d} días</span>`; sem='verde'; verde++; }
+    }
+    return {n, cargo, fechaTxt, diasSin, badge, sem};
+  }).sort((a,b)=>({rojo:0,amarillo:1,verde:2}[a.sem]??3)-({rojo:0,amarillo:1,verde:2}[b.sem]??3));
+
+  set('kpi-sem-rojo', rojo);
+  set('kpi-sem-amarillo', amarillo);
+  set('kpi-sem-verde', verde);
+  set('badge-descansos', allW.length);
+  tbl('tbl-descansos', rows.length
+    ? rows.map(r=>`<tr>
+        <td style="font-weight:500">${r.n}</td>
+        <td><span class="badge badge-gray">${r.cargo}</span></td>
+        <td>${r.fechaTxt}</td>
+        <td style="text-align:center">${r.diasSin}</td>
+        <td>${r.badge}</td>
+      </tr>`).join('')
+    : empty(5));
+}
+
+// ─── CHART OPTIONS ────────────────────────────────────────────────────────────
+function chartOpts(yLabel, horizontal=false) {
+  return {
+    responsive:true, maintainAspectRatio:true,
+    indexAxis: horizontal ? 'y' : 'x',
+    plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.parsed[horizontal?'x':'y']} ${yLabel.toLowerCase()}`}} },
+    scales:{
+      x:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{family:'Barlow',size:11},color:'#718096',maxTicksLimit:8}},
+      y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{family:'Barlow',size:11},color:'#718096'}}
+    }
+  };
+}
+function destroyChart(id) { if(charts[id]){charts[id].destroy();delete charts[id];} }
+
+// ─── DOM HELPERS ─────────────────────────────────────────────────────────────
+function set(id, val)  { const el=document.getElementById(id); if(el) el.textContent=val; }
+function tbl(id, html) { const el=document.getElementById(id); if(el) el.innerHTML=html; }
+function empty(cols, msg='Sin datos') { return `<tr><td colspan="${cols}" class="empty-state">${msg}</td></tr>`; }
+function showLoading(v) { document.getElementById('loading-overlay').classList.toggle('hidden',!v); }
+function showError(msg) { const b=document.getElementById('error-banner'); b.textContent=msg; b.style.display='block'; }
+function hideError()    { document.getElementById('error-banner').style.display='none'; }
+
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
