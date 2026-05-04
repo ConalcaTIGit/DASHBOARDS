@@ -549,9 +549,9 @@
     <div style="background:white;border-radius:10px;border:1.5px solid var(--gris-borde);padding:14px 18px;margin-bottom:16px;font-size:13px;line-height:1.6;color:var(--gris-texto)">
       <strong style="color:var(--negro)">¿Cómo funciona este semáforo?</strong><br>
       Muestra el último día de descanso registrado por trabajador en el período filtrado.
-      <span class="semaforo sem-verde" style="margin-left:10px"></span><strong>Verde</strong>: ≤ 6 días sin descanso &nbsp;
-      <span class="semaforo sem-amarillo"></span><strong>Amarillo</strong>: 7 días &nbsp;
-      <span class="semaforo sem-rojo"></span><strong>Rojo</strong>: &gt; 7 días — requiere atención.
+      <span class="semaforo sem-verde" style="margin-left:10px"></span><strong>Verde</strong>: ≤ 15 días sin descanso &nbsp;
+      <span class="semaforo sem-amarillo"></span><strong>Amarillo</strong>: 15 días &nbsp;
+      <span class="semaforo sem-rojo"></span><strong>Rojo</strong>: &gt; 15 días — requiere atención.
     </div>
 
     <div class="kpi-row" style="grid-template-columns:repeat(3,1fr);max-width:500px">
@@ -572,6 +572,7 @@
     <div class="panel">
       <div class="panel-header">
         <span class="panel-title">Último día de descanso por trabajador</span>
+        <button onclick="exportarDescansos()" style="background:var(--naranja);border:none;color:white;padding:6px 14px;border-radius:6px;font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">⬇ Descargar CSV</button>
         <span class="panel-badge" id="badge-descansos">0</span>
       </div>
       <div class="panel-body table-scroll-lg">
@@ -1042,8 +1043,8 @@ function renderTab3(data) {
     } else {
       const d = Math.floor((today - lastD)/(1000*60*60*24));
       diasSin=d; fechaTxt=fmtDate(lastD);
-      if (d>7)      { badge=`<span class="dias-badge dias-alert"><span class="semaforo sem-rojo"></span>${d} días</span>`; sem='rojo'; rojo++; }
-      else if(d===7){ badge=`<span class="dias-badge dias-warn"><span class="semaforo sem-amarillo"></span>${d} días</span>`; sem='amarillo'; amarillo++; }
+      if (d>15)      { badge=`<span class="dias-badge dias-alert"><span class="semaforo sem-rojo"></span>${d} días</span>`; sem='rojo'; rojo++; }
+      else if(d===15){ badge=`<span class="dias-badge dias-warn"><span class="semaforo sem-amarillo"></span>${d} días</span>`; sem='amarillo'; amarillo++; }
       else          { badge=`<span class="dias-badge dias-ok"><span class="semaforo sem-verde"></span>${d} días</span>`; sem='verde'; verde++; }
     }
     return {n, cargo, fechaTxt, diasSin, badge, sem};
@@ -1091,6 +1092,35 @@ function switchTab(id, btn) {
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
+}
+
+function exportarDescansos() {
+  const rows = document.querySelectorAll('#tbl-descansos tr');
+  if (!rows.length) return;
+
+  const headers = ['Nombre', 'Cargo', 'Último Descanso', 'Días sin descanso', 'Estado'];
+  const lines = [headers.join(',')];
+
+  rows.forEach(tr => {
+    const celdas = tr.querySelectorAll('td');
+    if (!celdas.length) return;
+    const fila = [
+      celdas[0]?.textContent.trim(),
+      celdas[1]?.textContent.trim(),
+      celdas[2]?.textContent.trim(),
+      celdas[3]?.textContent.trim(),
+      celdas[4]?.textContent.trim(),  // texto limpio del badge
+    ].map(v => `"${(v||'').replace(/"/g, '""')}"`);
+    lines.push(fila.join(','));
+  });
+
+  const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `descansos_cartagena_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
