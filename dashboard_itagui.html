@@ -363,12 +363,16 @@
     <select id="f-nombre" style="min-width:200px"></select>
   </div>
   <div class="filter-group">
-    <label>Turno</label>
-    <select id="f-turno"></select>
-  </div>
-  <div class="filter-group">
     <label>Proceso</label>
     <select id="f-proceso"></select>
+  </div>
+  <div class="filter-group">
+    <label>Cargo</label>
+    <select id="f-cargo"></select>
+  </div>
+  <div class="filter-group">
+    <label>Turno</label>
+    <select id="f-turno"></select>
   </div>
 </div>
 
@@ -759,6 +763,10 @@ async function loadData() {
 
 // ─── FILTERS ─────────────────────────────────────────────────────────────────
 function buildFilters() {
+  const hoy = new Date();
+  const anioHoy = String(hoy.getFullYear());
+  const mesHoy  = String(hoy.getMonth() + 1).padStart(2,'0');
+  const diaHoy  = String(hoy.getDate()).padStart(2,'0');
   const anios   = [...new Set(rawData.map(r => r._anio))].filter(Boolean).sort();
   const meses   = [...new Set(rawData.map(r => r._mes))].filter(Boolean).sort();
   const dias    = [...new Set(rawData.map(r => r._dia))].filter(v=>v&&v!=='??').sort((a,b)=>+a-+b);
@@ -769,17 +777,19 @@ function buildFilters() {
   turnosRaw.forEach(t => { turnosMap[turnoLabel(t)] = t; });
   const turnoLabels = Object.keys(turnosMap).sort();
   const procsSet = [...new Set(rawData.map(r => r._proceso || '(Sin proceso)'))].sort();
+  const cargos = [...new Set(rawData.map(r => get(r, C.CARGO) || '(Sin cargo)'))].sort();
 
-  populate('f-anio',   anios,  anios[anios.length-1]);
-  populate('f-mes',    meses.map(m => ({val:m, label:MESES[m]||m})), meses[meses.length-1]);
-  populate('f-dia',    ['',...dias], '');
+  populate('f-anio', [{val:'', label:'Todos'}, ...anios], anioHoy);
+  populate('f-mes', [{ val: '', label: 'Todos' }, ...meses.map(m => ({ val: m, label: MESES[m] || m }))], mesHoy);
+  populate('f-dia', [{val:'', label:'Todos'}, ...dias], '');
   populate('f-nombre', ['',...nombres], '');
   // Para turno, guardamos el valor raw en el option pero mostramos label limpio
   const turnoOpts = ['',...turnoLabels].map(l => ({val: l ? turnosMap[l] : '', label: l || 'Todos'}));
   populate('f-turno',  turnoOpts, '');
   populate('f-proceso',['',...procsSet], '');
+  populate('f-cargo', ['', ...cargos], '');
 
-  ['f-anio','f-mes','f-dia','f-nombre','f-turno','f-proceso'].forEach(id => {
+  ['f-anio','f-mes','f-dia','f-nombre','f-turno','f-proceso', 'f-cargo'].forEach(id => {
     document.getElementById(id).addEventListener('change', renderAll);
   });
 }
@@ -806,6 +816,7 @@ function getFilters() {
     nombre:  document.getElementById('f-nombre').value,
     turno:   document.getElementById('f-turno').value,
     proceso: document.getElementById('f-proceso').value,
+    cargo: document.getElementById('f-cargo').value,
   };
 }
 
@@ -818,6 +829,7 @@ function applyFilters() {
     if (f.nombre  && row._nombre !== f.nombre) return false;
     if (f.turno   && get(row, C.TURNO)   !== f.turno)  return false;
     if (f.proceso && (row._proceso || '(Sin proceso)') !== f.proceso) return false;
+    if (f.cargo && (get(row, C.CARGO) || '(Sin cargo)') !== f.cargo) return false;
     return true;
   });
 }
