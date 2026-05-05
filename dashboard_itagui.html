@@ -572,7 +572,8 @@
     <div class="panel">
       <div class="panel-header">
         <span class="panel-title">Último día de descanso por trabajador</span>
-        <button onclick="exportarDescansos()" style="background:var(--naranja);border:none;color:white;padding:6px 14px;border-radius:6px;font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">⬇ Descargar CSV</button>
+        <button onclick="exportarDescansosCSV()" style="background:var(--naranja);border:none;color:white;padding:6px 14px;border-radius:6px;font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">⬇ Descargar CSV</button>
+        <button onclick="exportarDescansosExcel()" style="background:var(--naranja);border:none;color:white;padding:6px 14px;border-radius:6px;font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">⬇ Descargar Excel</button>
         <span class="panel-badge" id="badge-descansos">0</span>
       </div>
       <div class="panel-body table-scroll-lg">
@@ -593,7 +594,7 @@
   </div>
 
 </main>
-
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script>
 // ─── URLS ────────────────────────────────────────────────────────────────────
 const URL_ASIST = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTO6s7dfqRPyuzhLou-LCwRDgP-XH7JxKaAI78A--fzRxAhWTS7fGsDq-45oVLybaOQa3K7ufN68onS/pub?gid=0&single=true&output=csv";
@@ -1094,7 +1095,97 @@ function switchTab(id, btn) {
   btn.classList.add('active');
 }
 
-function exportarDescansos() {
+
+function exportarDescansosExcel() {
+  const rows = document.querySelectorAll('#tbl-descansos tr');
+  if (!rows.length) return;
+
+  const data = [
+    ['Nombre', 'Cargo', 'Último Descanso', 'Días sin descanso', 'Estado']
+  ];
+
+  const estados = []; // para aplicar color luego
+
+  rows.forEach(tr => {
+    const celdas = tr.querySelectorAll('td');
+    if (!celdas.length) return;
+
+    const estadoTxt = celdas[4]?.textContent.trim() || '';
+
+    data.push([
+      celdas[0]?.textContent.trim(),
+      celdas[1]?.textContent.trim(),
+      celdas[2]?.textContent.trim(),
+      celdas[3]?.textContent.trim(),
+      estadoTxt
+    ]);
+
+    estados.push(estadoTxt.toLowerCase());
+  });
+
+  // Crear hoja
+  const ws = XLSX.utils.aoa_to_sheet(data);
+
+  // Ajuste de columnas
+  ws['!cols'] = [
+    { wch: 28 },
+    { wch: 22 },
+    { wch: 20 },
+    { wch: 18 },
+    { wch: 20 }
+  ];
+
+  // Estilo encabezados
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let C = range.s.c; C <= range.e.c; ++C) {
+    const cell = ws[XLSX.utils.encode_cell({ r: 0, c: C })];
+    if (cell) {
+      cell.s = {
+        font: { bold: true },
+        alignment: { horizontal: "center" }
+      };
+    }
+  }
+
+  // Aplicar semaforización
+  estados.forEach((estado, i) => {
+    const rowIndex = i + 1; // porque 0 es header
+    const cellRef = XLSX.utils.encode_cell({ r: rowIndex, c: 4 });
+    const cell = ws[cellRef];
+    if (!cell) return;
+
+    let color = null;
+
+    if (estado.includes('sin dato') || estado.includes('rojo')) {
+      color = "FFC7CE"; // rojo claro
+    } else if (estado.includes('15')) {
+      color = "FFEB9C"; // amarillo
+    } else if (estado.includes('día')) {
+      color = "C6EFCE"; // verde
+    }
+
+    if (color) {
+      cell.s = {
+        fill: {
+          patternType: "solid",
+          fgColor: { rgb: color }
+        }
+      };
+    }
+  });
+
+  // Crear libro
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Descansos');
+
+  // Exportar
+  XLSX.writeFile(
+    wb,
+    `descansos_itagui_${new Date().toISOString().slice(0,10)}.xlsx`
+  );
+}
+
+function exportarDescansosCSV() {
   const rows = document.querySelectorAll('#tbl-descansos tr');
   if (!rows.length) return;
 
@@ -1118,7 +1209,7 @@ function exportarDescansos() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `descansos_cartagena_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `descansos_itagui_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
