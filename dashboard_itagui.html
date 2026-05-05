@@ -823,6 +823,10 @@ function getFilters() {
 function applyFilters() {
   const f = getFilters();
   return rawData.filter(row => {
+    // Filtro absoluto
+    const permiso = (get(row, C.PERMISO) || '').toUpperCase().trim();
+    if (permiso === 'NO ACTIVO') return false;
+    // Filtros 
     if (f.anio    && row._anio !== f.anio) return false;
     if (f.mes     && row._mes  !== f.mes)  return false;
     if (f.dia     && row._dia  !== f.dia)  return false;
@@ -1060,7 +1064,7 @@ function renderTab3(data) {
       else if(d===15){ badge=`<span class="dias-badge dias-warn"><span class="semaforo sem-amarillo"></span>${d} días</span>`; sem='amarillo'; amarillo++; }
       else          { badge=`<span class="dias-badge dias-ok"><span class="semaforo sem-verde"></span>${d} días</span>`; sem='verde'; verde++; }
     }
-    return {n, cargo, fechaTxt, diasSin, badge, sem};
+    return {n, cargo, fechaTxt, diasSin, badge, sem, cedula: get(data.find(x => x._nombre === n) || [], C.ID)};
   }).sort((a,b)=>({rojo:0,amarillo:1,verde:2}[a.sem]??3)-({rojo:0,amarillo:1,verde:2}[b.sem]??3));
 
   set('kpi-sem-rojo', rojo);
@@ -1068,7 +1072,7 @@ function renderTab3(data) {
   set('kpi-sem-verde', verde);
   set('badge-descansos', allW.length);
   tbl('tbl-descansos', rows.length
-    ? rows.map(r=>`<tr>
+    ? rows.map(r=>`<tr data-id="${r.cedula || ''}">
         <td style="font-weight:500">${r.n}</td>
         <td><span class="badge badge-gray">${r.cargo}</span></td>
         <td>${r.fechaTxt}</td>
@@ -1113,18 +1117,20 @@ function exportarDescansosExcel() {
   if (!rows.length) return;
 
   const data = [
-    ['Nombre', 'Cargo', 'Último Descanso', 'Días sin descanso', 'Estado']
+    ['Cédula', 'Nombre', 'Cargo', 'Último Descanso', 'Días sin descanso', 'Estado']
   ];
 
-  const estados = []; // para aplicar color luego
+  const estados = [];
 
   rows.forEach(tr => {
     const celdas = tr.querySelectorAll('td');
     if (!celdas.length) return;
 
+    const cedula = tr.getAttribute('data-id') || '';
     const estadoTxt = celdas[4]?.textContent.trim() || '';
 
     data.push([
+      cedula,
       celdas[0]?.textContent.trim(),
       celdas[1]?.textContent.trim(),
       celdas[2]?.textContent.trim(),
@@ -1135,11 +1141,10 @@ function exportarDescansosExcel() {
     estados.push(estadoTxt.toLowerCase());
   });
 
-  // Crear hoja
   const ws = XLSX.utils.aoa_to_sheet(data);
 
-  // Ajuste de columnas
   ws['!cols'] = [
+    { wch: 15 },
     { wch: 28 },
     { wch: 22 },
     { wch: 20 },
@@ -1147,10 +1152,10 @@ function exportarDescansosExcel() {
     { wch: 20 }
   ];
 
-  // Estilo encabezados
+  // Header bold
   const range = XLSX.utils.decode_range(ws['!ref']);
-  for (let C = range.s.c; C <= range.e.c; ++C) {
-    const cell = ws[XLSX.utils.encode_cell({ r: 0, c: C })];
+  for (let Cc = range.s.c; Cc <= range.e.c; ++Cc) {
+    const cell = ws[XLSX.utils.encode_cell({ r: 0, c: Cc })];
     if (cell) {
       cell.s = {
         font: { bold: true },
@@ -1159,38 +1164,32 @@ function exportarDescansosExcel() {
     }
   }
 
-  // Aplicar semaforización
+  // Semáforo
   estados.forEach((estado, i) => {
-    const rowIndex = i + 1; // porque 0 es header
-    const cellRef = XLSX.utils.encode_cell({ r: rowIndex, c: 4 });
+    const cellRef = XLSX.utils.encode_cell({ r: i + 1, c: 5 });
     const cell = ws[cellRef];
     if (!cell) return;
 
     let color = null;
 
     if (estado.includes('sin dato') || estado.includes('rojo')) {
-      color = "FFC7CE"; // rojo claro
+      color = "FFC7CE";
     } else if (estado.includes('15')) {
-      color = "FFEB9C"; // amarillo
+      color = "FFEB9C";
     } else if (estado.includes('día')) {
-      color = "C6EFCE"; // verde
+      color = "C6EFCE";
     }
 
     if (color) {
       cell.s = {
-        fill: {
-          patternType: "solid",
-          fgColor: { rgb: color }
-        }
+        fill: { patternType: "solid", fgColor: { rgb: color } }
       };
     }
   });
 
-  // Crear libro
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Descansos');
 
-  // Exportar
   XLSX.writeFile(
     wb,
     `descansos_itagui_${new Date().toISOString().slice(0,10)}.xlsx`
