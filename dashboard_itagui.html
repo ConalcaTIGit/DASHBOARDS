@@ -131,6 +131,26 @@
   .filter-group select:focus {
     outline: none; border-color: var(--naranja);
   }
+  .filter-group input[type="text"] {
+    border: 1.5px solid var(--gris-borde);
+    border-radius: 6px; padding: 5px 30px 5px 30px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px; font-weight: 500; color: var(--negro);
+    background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%23718096' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") no-repeat left 9px center;
+    min-width: 230px;
+  }
+  .filter-group input[type="text"]:focus {
+    outline: none; border-color: var(--naranja);
+  }
+  .filter-clear {
+    position: absolute; right: 6px; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none; cursor: pointer;
+    color: var(--gris-sub); font-size: 16px; line-height: 1;
+    padding: 2px 6px; border-radius: 4px;
+  }
+  .filter-clear:hover { background: var(--gris-borde); color: var(--negro); }
+  .filter-input-wrap { position: relative; display: inline-block; }
   #filter-nombre {
     min-width: 200px;
   }
@@ -360,7 +380,11 @@
   </div>
   <div class="filter-group">
     <label>Nombre</label>
-    <select id="f-nombre" style="min-width:200px"></select>
+    <div class="filter-input-wrap">
+      <input type="text" list="dl-nombres" id="f-nombre" placeholder="Buscar nombre…" autocomplete="off">
+      <button type="button" class="filter-clear" id="f-nombre-clear" title="Limpiar">×</button>
+      <datalist id="dl-nombres"></datalist>
+    </div>
   </div>
   <div class="filter-group">
     <label>Proceso</label>
@@ -383,6 +407,7 @@
     <button class="tab-btn active" onclick="switchTab('tab1', this)">Asistencia General</button>
     <button class="tab-btn" onclick="switchTab('tab2', this)">Retardos & Salidas</button>
     <button class="tab-btn" onclick="switchTab('tab3', this)">Descansos</button>
+    <button class="tab-btn" onclick="switchTab('tab4', this)">Rotación de Personal</button>
   </div>
 
   <!-- ══════════════════════════════════════════
@@ -597,12 +622,137 @@
     </div>
   </div>
 
+  <!-- ══════════════════════════════════════════
+       TAB 4: ROTACIÓN DE PERSONAL
+  ═══════════════════════════════════════════ -->
+  <div id="tab4" class="tab-content">
+    <div style="background:white;border-radius:10px;border:1.5px solid var(--gris-borde);padding:14px 18px;margin-bottom:16px;font-size:13px;line-height:1.6;color:var(--gris-texto)">
+      <strong style="color:var(--negro)">Análisis de Rotación (visión Selección)</strong><br>
+      Los filtros <strong>Año / Mes / Cargo / Nombre</strong> aplican sobre la fecha de retiro. Métricas claves:
+      <strong>Tenure</strong> = días entre ingreso y retiro;
+      <strong>Rotación temprana</strong> = retiro en ≤30 días (señal de error de selección);
+      <strong>Crítica</strong> = ≤7 días.
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Retiros</div>
+        <div class="kpi-value orange" id="kpi-ret-total">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Tenure Promedio</div>
+        <div class="kpi-value" id="kpi-ret-tenure">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Rotación Crítica ≤7d</div>
+        <div class="kpi-value red" id="kpi-ret-critica">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Rotación Temprana ≤30d</div>
+        <div class="kpi-value red" id="kpi-ret-temprana">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">% Ausentismo/Abandono</div>
+        <div class="kpi-value orange" id="kpi-ret-ausent">–</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">% Nunca Trabajó</div>
+        <div class="kpi-value red" id="kpi-ret-nunca">–</div>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <!-- Distribución por motivo -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Distribución por Motivo</span></div>
+        <div class="chart-container"><canvas id="chart-ret-motivo"></canvas></div>
+        <div class="panel-body table-scroll" style="border-top:1.5px solid var(--gris-borde)">
+          <table class="data-table">
+            <thead><tr><th>Motivo</th><th style="text-align:right">Cant.</th><th style="text-align:right">%</th></tr></thead>
+            <tbody id="tbl-ret-motivo"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Categoría: Voluntaria vs Involuntaria vs Nunca trabajó -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Tipo de Retiro</span></div>
+        <div class="chart-container"><canvas id="chart-ret-tipo"></canvas></div>
+        <div class="panel-body table-scroll" style="border-top:1.5px solid var(--gris-borde)">
+          <table class="data-table">
+            <thead><tr><th>Tipo</th><th style="text-align:right">Cant.</th><th style="text-align:right">Tenure Prom.</th></tr></thead>
+            <tbody id="tbl-ret-tipo"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Top cargos con rotación -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Top Cargos con Rotación</span></div>
+        <div class="chart-container"><canvas id="chart-ret-cargo"></canvas></div>
+        <div class="panel-body table-scroll" style="border-top:1.5px solid var(--gris-borde)">
+          <table class="data-table">
+            <thead><tr><th>Cargo</th><th style="text-align:right">Cant.</th><th style="text-align:right">Tenure Prom.</th></tr></thead>
+            <tbody id="tbl-ret-cargo"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Evolución mensual de retiros -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Retiros por Mes</span></div>
+        <div class="chart-container"><canvas id="chart-ret-evol"></canvas></div>
+      </div>
+
+      <!-- Distribución por bucket de tenure -->
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Distribución por Tenure</span></div>
+        <div class="chart-container"><canvas id="chart-ret-tenure"></canvas></div>
+        <div class="panel-body table-scroll" style="border-top:1.5px solid var(--gris-borde)">
+          <table class="data-table">
+            <thead><tr><th>Rango</th><th style="text-align:right">Cant.</th><th style="text-align:right">%</th></tr></thead>
+            <tbody id="tbl-ret-tenure"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla detallada de retiros -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Detalle de Retiros</span>
+        <button onclick="exportarRetirosExcel()" style="background:var(--naranja);border:none;color:white;padding:6px 14px;border-radius:6px;font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">⬇ Descargar Excel</button>
+        <span class="panel-badge" id="badge-ret-detalle">0</span>
+      </div>
+      <div class="panel-body table-scroll-lg">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Cédula</th>
+              <th>Nombre</th>
+              <th>Cargo</th>
+              <th>F. Ingreso</th>
+              <th>F. Retiro</th>
+              <th style="text-align:center">Tenure</th>
+              <th>Motivo</th>
+              <th>Tipo</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-ret-detalle"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </main>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script>
 // ─── URLS ────────────────────────────────────────────────────────────────────
-const URL_ASIST = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTO6s7dfqRPyuzhLou-LCwRDgP-XH7JxKaAI78A--fzRxAhWTS7fGsDq-45oVLybaOQa3K7ufN68onS/pub?gid=0&single=true&output=csv";
-const URL_PROC  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTO6s7dfqRPyuzhLou-LCwRDgP-XH7JxKaAI78A--fzRxAhWTS7fGsDq-45oVLybaOQa3K7ufN68onS/pub?gid=1030548868&single=true&output=csv";
+const URL_ASIST   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTO6s7dfqRPyuzhLou-LCwRDgP-XH7JxKaAI78A--fzRxAhWTS7fGsDq-45oVLybaOQa3K7ufN68onS/pub?gid=0&single=true&output=csv";
+const URL_PROC    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTO6s7dfqRPyuzhLou-LCwRDgP-XH7JxKaAI78A--fzRxAhWTS7fGsDq-45oVLybaOQa3K7ufN68onS/pub?gid=1030548868&single=true&output=csv";
+const URL_RETIROS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTO6s7dfqRPyuzhLou-LCwRDgP-XH7JxKaAI78A--fzRxAhWTS7fGsDq-45oVLybaOQa3K7ufN68onS/pub?gid=308350617&single=true&output=csv";
 
 // ─── COLUMN INDICES (fijos por posición, no por nombre) ──────────────────────
 // 0:Apellidos 1:Nombres 2:Identificador 3:Grupo 4:Fecha 5:Permiso 6:Turno
@@ -615,8 +765,9 @@ const C = {
 };
 
 // ─── GLOBALS ─────────────────────────────────────────────────────────────────
-let rawData = [];   // array of arrays (rows by index)
-let procMap = {};   // NOMBRE_UPPER → proceso
+let rawData = [];     // array of arrays (rows by index)
+let procMap = {};     // NOMBRE_UPPER → proceso
+let retirosData = []; // [{cedula, nombre, cargo, fIngreso, fRetiro, motivo, tenure, tipo}]
 let charts = {};
 const MESES = {'01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio',
                '07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'};
@@ -660,6 +811,36 @@ function parseDate(str) {
   const m = str.match(/(\d{2})-(\d{2})-(\d{4})/);
   if (!m) return null;
   return new Date(+m[3], +m[2]-1, +m[1]);
+}
+// Date: "12/11/2025" (D/M/YYYY) → Date  — usado en hoja Retiros
+function parseDateRetiro(str) {
+  if (!str) return null;
+  const m = str.trim().match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return null;
+  return new Date(+m[3], +m[2]-1, +m[1]);
+}
+// Clasifica el motivo en una categoría útil para selección
+function clasificarMotivo(motivo) {
+  const m = (motivo||'').toUpperCase();
+  if (!m) return 'Sin dato';
+  if (m.includes('NUNCA TRABAJ') || m.includes('INGRESO NO ACTIVO')) return 'Nunca trabajó';
+  if (m.includes('RENUNCIA VOLUNTARIA')) return 'Voluntaria';
+  if (m.includes('ABANDONO') || m.includes('AUSENT')) return 'Ausentismo/Abandono';
+  if (m.includes('INCAPACIDAD FALSA')) return 'Ausentismo/Abandono';
+  if (m.includes('JUSTA CAUSA')) return 'Justa causa';
+  if (m.includes('DIMENC') || m.includes('DIMENS')) return 'Dimensionamiento';
+  if (m.includes('SEGURIDAD') || m.includes('PERSONAL RESTRINGIDO')) return 'Conducta/Seguridad';
+  if (m.includes('SIZING')) return 'Dimensionamiento';
+  return 'Otro';
+}
+function bucketTenure(d) {
+  if (d == null || isNaN(d)) return 'Sin dato';
+  if (d <= 0) return 'Mismo día (0d)';
+  if (d <= 7) return '≤ 7 días';
+  if (d <= 30) return '8–30 días';
+  if (d <= 90) return '31–90 días';
+  if (d <= 180) return '91–180 días';
+  return '> 180 días';
 }
 function fmtDate(d) {
   if (!d) return '–';
@@ -710,13 +891,15 @@ async function loadData() {
   showLoading(true); hideError();
   document.getElementById('btn-refresh').disabled = true;
   try {
-    const [r1, r2] = await Promise.all([
-      fetch(URL_ASIST + '&_=' + Date.now()),
-      fetch(URL_PROC  + '&_=' + Date.now())
+    const [r1, r2, r3] = await Promise.all([
+      fetch(URL_ASIST   + '&_=' + Date.now()),
+      fetch(URL_PROC    + '&_=' + Date.now()),
+      fetch(URL_RETIROS + '&_=' + Date.now())
     ]);
     if (!r1.ok) throw new Error('HTTP ' + r1.status + ' al leer sheet principal');
     if (!r2.ok) throw new Error('HTTP ' + r2.status + ' al leer sheet de procesos');
-    const [csv1, csv2] = await Promise.all([r1.text(), r2.text()]);
+    if (!r3.ok) throw new Error('HTTP ' + r3.status + ' al leer sheet de retiros');
+    const [csv1, csv2, csv3] = await Promise.all([r1.text(), r2.text(), r3.text()]);
 
     // Leer asistencia como array-de-arrays, saltar header (fila 0)
     const allRows = parseCSVRaw(csv1);
@@ -749,6 +932,58 @@ async function loadData() {
       row._proceso = procMap[row._nombre] || '';
     });
 
+    // ── Hoja Retiros: T.I, Identificacion, Nombre, Cargo TH, F. Ingreso, F.Retiro, Motivo
+    const retirosRows = parseCSVRaw(csv3).filter(r => r.some(v => v));
+    retirosData = retirosRows.slice(1)
+      .filter(r => (r[2]||'').trim() !== '')  // requiere Nombre
+      .map(r => {
+        const cedula  = (r[1]||'').trim();
+        const nombre  = (r[2]||'').trim().toUpperCase();
+        const cargo   = (r[3]||'').trim().toUpperCase();
+        const dIng    = parseDateRetiro(r[4]||'');
+        const dRet    = parseDateRetiro(r[5]||'');
+        const motivo  = (r[6]||'').trim();
+        const tenure  = (dIng && dRet) ? Math.floor((dRet - dIng)/(1000*60*60*24)) : null;
+        const cat     = clasificarMotivo(motivo);
+        const tipo    = cat === 'Voluntaria' ? 'Voluntaria'
+                      : cat === 'Nunca trabajó' ? 'Nunca trabajó'
+                      : 'Involuntaria';
+        return {
+          cedula, nombre, cargo, motivo, tenure,
+          fIngreso: dIng, fRetiro: dRet, categoria: cat, tipo,
+          _anio: dRet ? String(dRet.getFullYear()) : '?',
+          _mes:  dRet ? String(dRet.getMonth()+1).padStart(2,'0') : '??'
+        };
+      });
+
+    // ── Match por cédula: la cédula es la llave de identidad, el nombre es display.
+    // Unifica nombres entre Asistencias y Retiros (típos, acentos, espacios).
+    const cedulaNombres = {};
+    rawData.forEach(r => {
+      const c = get(r, C.ID);
+      if (!c) return;
+      if (!cedulaNombres[c]) cedulaNombres[c] = new Set();
+      if (r._nombre) cedulaNombres[c].add(r._nombre);
+    });
+    retirosData.forEach(r => {
+      if (!r.cedula) return;
+      if (!cedulaNombres[r.cedula]) cedulaNombres[r.cedula] = new Set();
+      if (r.nombre) cedulaNombres[r.cedula].add(r.nombre);
+    });
+    // Canónico = nombre más largo (suele ser el más completo)
+    const cedulaCanonico = {};
+    Object.entries(cedulaNombres).forEach(([c, names]) => {
+      cedulaCanonico[c] = [...names].sort((a,b)=>b.length-a.length)[0];
+    });
+    // Re-asignar a TODOS los registros para que la misma cédula = mismo nombre en todo el sistema
+    rawData.forEach(r => {
+      const c = get(r, C.ID);
+      if (c && cedulaCanonico[c]) r._nombre = cedulaCanonico[c];
+    });
+    retirosData.forEach(r => {
+      if (r.cedula && cedulaCanonico[r.cedula]) r.nombre = cedulaCanonico[r.cedula];
+    });
+
     buildFilters();
     renderAll();
     document.getElementById('last-update').textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-CO');
@@ -770,7 +1005,26 @@ function buildFilters() {
   const anios   = [...new Set(rawData.map(r => r._anio))].filter(Boolean).sort();
   const meses   = [...new Set(rawData.map(r => r._mes))].filter(Boolean).sort();
   const dias    = [...new Set(rawData.map(r => r._dia))].filter(v=>v&&v!=='??').sort((a,b)=>+a-+b);
-  const nombres = [...new Set(rawData.map(r => r._nombre))].filter(Boolean).sort();
+
+  // Nombres combinados (asistencia + retiros) con detección de homónimos por cédula.
+  // Si un nombre comparte 2+ cédulas distintas, se expone como "NOMBRE (CC <ced>)".
+  const nombreCedulas = {}; // nombre → Set<cedula>
+  rawData.forEach(r => {
+    const n = r._nombre; if (!n) return;
+    if (!nombreCedulas[n]) nombreCedulas[n] = new Set();
+    const c = get(r, C.ID); if (c) nombreCedulas[n].add(c);
+  });
+  retirosData.forEach(r => {
+    const n = r.nombre; if (!n) return;
+    if (!nombreCedulas[n]) nombreCedulas[n] = new Set();
+    if (r.cedula) nombreCedulas[n].add(r.cedula);
+  });
+  const nombresOpts = [];
+  Object.keys(nombreCedulas).sort().forEach(n => {
+    const ceds = nombreCedulas[n];
+    if (ceds.size <= 1) nombresOpts.push(n);
+    else [...ceds].sort().forEach(c => nombresOpts.push(`${n} (CC ${c})`));
+  });
   // Turno: solo los que NO son Descanso, con label limpio
   const turnosRaw = [...new Set(rawData.map(r => get(r, C.TURNO)).filter(t => t && t !== 'Descanso'))];
   const turnosMap = {}; // label → raw value original
@@ -782,16 +1036,33 @@ function buildFilters() {
   populate('f-anio', [{val:'', label:'Todos'}, ...anios], anioHoy);
   populate('f-mes', [{ val: '', label: 'Todos' }, ...meses.map(m => ({ val: m, label: MESES[m] || m }))], mesHoy);
   populate('f-dia', [{val:'', label:'Todos'}, ...dias], '');
-  populate('f-nombre', ['',...nombres], '');
+  // Datalist para autocompletado del input de nombre
+  const dl = document.getElementById('dl-nombres');
+  dl.innerHTML = nombresOpts.map(v => `<option value="${v.replace(/"/g,'&quot;')}"></option>`).join('');
   // Para turno, guardamos el valor raw en el option pero mostramos label limpio
   const turnoOpts = ['',...turnoLabels].map(l => ({val: l ? turnosMap[l] : '', label: l || 'Todos'}));
   populate('f-turno',  turnoOpts, '');
   populate('f-proceso',['',...procsSet], '');
   populate('f-cargo', ['', ...cargos], '');
 
-  ['f-anio','f-mes','f-dia','f-nombre','f-turno','f-proceso', 'f-cargo'].forEach(id => {
+  ['f-anio','f-mes','f-dia','f-turno','f-proceso', 'f-cargo'].forEach(id => {
     document.getElementById(id).addEventListener('change', renderAll);
   });
+  // Nombre: input con debounce (filtra mientras se escribe) + botón limpiar
+  const inputNombre = document.getElementById('f-nombre');
+  if (!inputNombre._listenerAttached) {
+    let debTimer;
+    inputNombre.addEventListener('input', () => {
+      clearTimeout(debTimer);
+      debTimer = setTimeout(renderAll, 200);
+    });
+    document.getElementById('f-nombre-clear').addEventListener('click', () => {
+      inputNombre.value = '';
+      renderAll();
+      inputNombre.focus();
+    });
+    inputNombre._listenerAttached = true;
+  }
 }
 
 function populate(id, items, selected) {
@@ -820,17 +1091,41 @@ function getFilters() {
   };
 }
 
+// Devuelve cómo filtrar a partir del valor del input.
+//   - "1035438521" (sólo dígitos)           → filtro por cédula
+//   - "NOMBRE (CC 1234)"                    → exacto: nombre + cédula
+//   - "juan perez" (texto libre)            → match parcial sobre nombre
+function parseNombreFiltro(valor) {
+  if (!valor) return null;
+  const v = valor.trim();
+  if (!v) return null;
+  if (/^\d{5,}$/.test(v)) return { cedula: v, soloCedula: true };
+  const m = v.match(/^(.+?)\s*\(CC\s+(.+?)\)\s*$/i);
+  if (m) return { nombre: m[1].trim().toUpperCase(), cedula: m[2].trim(), exact:true };
+  return { nombre: v.toUpperCase(), cedula: null, exact:false };
+}
+
 function applyFilters() {
   const f = getFilters();
+  const fn = parseNombreFiltro(f.nombre);
   return rawData.filter(row => {
     // Filtro absoluto
     const permiso = (get(row, C.PERMISO) || '').toUpperCase().trim();
     if (permiso === 'NO ACTIVO') return false;
-    // Filtros 
+    // Filtros
     if (f.anio    && row._anio !== f.anio) return false;
     if (f.mes     && row._mes  !== f.mes)  return false;
     if (f.dia     && row._dia  !== f.dia)  return false;
-    if (f.nombre  && row._nombre !== f.nombre) return false;
+    if (fn) {
+      if (fn.soloCedula) {
+        if (get(row, C.ID) !== fn.cedula) return false;
+      } else if (fn.exact) {
+        if (fn.cedula && get(row, C.ID) !== fn.cedula) return false;
+        else if (!fn.cedula && row._nombre !== fn.nombre) return false;
+      } else {
+        if (!row._nombre.includes(fn.nombre)) return false;
+      }
+    }
     if (f.turno   && get(row, C.TURNO)   !== f.turno)  return false;
     if (f.proceso && (row._proceso || '(Sin proceso)') !== f.proceso) return false;
     if (f.cargo && (get(row, C.CARGO) || '(Sin cargo)') !== f.cargo) return false;
@@ -844,6 +1139,29 @@ function renderAll() {
   renderTab1(data);
   renderTab2(data);
   renderTab3(data);
+  renderTab4(applyFiltersRetiros());
+}
+
+// Filtra retiros por año/mes (sobre F.Retiro), nombre y cargo. Resto de filtros no aplican.
+function applyFiltersRetiros() {
+  const f = getFilters();
+  const fn = parseNombreFiltro(f.nombre);
+  return retirosData.filter(r => {
+    if (f.anio && r._anio !== f.anio) return false;
+    if (f.mes  && r._mes  !== f.mes)  return false;
+    if (fn) {
+      if (fn.soloCedula) {
+        if (r.cedula !== fn.cedula) return false;
+      } else if (fn.exact) {
+        if (fn.cedula && r.cedula !== fn.cedula) return false;
+        else if (!fn.cedula && r.nombre !== fn.nombre) return false;
+      } else {
+        if (!r.nombre.includes(fn.nombre)) return false;
+      }
+    }
+    if (f.cargo && f.cargo !== '(Sin cargo)' && r.cargo !== f.cargo) return false;
+    return true;
+  });
 }
 
 // ─── TAB 1: ASISTENCIA GENERAL ───────────────────────────────────────────────
@@ -1082,6 +1400,172 @@ function renderTab3(data) {
     : empty(5));
 }
 
+// ─── TAB 4: ROTACIÓN DE PERSONAL ─────────────────────────────────────────────
+function renderTab4(data) {
+  const total = data.length;
+
+  // Tenure (días) — sólo usar valores válidos (>=0)
+  const tenures = data.map(r => r.tenure).filter(v => v != null && !isNaN(v) && v >= 0);
+  const avgTenure = tenures.length ? Math.round(tenures.reduce((a,b)=>a+b,0)/tenures.length) : 0;
+
+  const criticos  = data.filter(r => r.tenure != null && r.tenure >= 0 && r.tenure <= 7).length;
+  const tempranos = data.filter(r => r.tenure != null && r.tenure >= 0 && r.tenure <= 30).length;
+  const ausent    = data.filter(r => r.categoria === 'Ausentismo/Abandono').length;
+  const nunca     = data.filter(r => r.categoria === 'Nunca trabajó').length;
+
+  const pct = (n) => total > 0 ? ((n/total)*100).toFixed(1) + ' %' : '0 %';
+
+  set('kpi-ret-total',    total.toLocaleString('es-CO'));
+  set('kpi-ret-tenure',   avgTenure + ' d');
+  set('kpi-ret-critica',  criticos + ' (' + pct(criticos) + ')');
+  set('kpi-ret-temprana', tempranos + ' (' + pct(tempranos) + ')');
+  set('kpi-ret-ausent',   pct(ausent));
+  set('kpi-ret-nunca',    pct(nunca));
+
+  // ── Distribución por motivo (texto exacto)
+  const porMotivo = {};
+  data.forEach(r => { const m = r.motivo || 'Sin dato'; porMotivo[m] = (porMotivo[m]||0)+1; });
+  const sortedMotivo = Object.entries(porMotivo).sort((a,b)=>b[1]-a[1]);
+  tbl('tbl-ret-motivo', sortedMotivo.length
+    ? sortedMotivo.map(([m,c]) => {
+        const p = total > 0 ? ((c/total)*100).toFixed(1) : '0';
+        return `<tr><td>${m}</td><td style="text-align:right">${c}</td><td style="text-align:right">${p}%</td></tr>`;
+      }).join('')
+      + `<tr style="font-weight:700"><td>Total</td><td style="text-align:right">${total}</td><td style="text-align:right">100%</td></tr>`
+    : empty(3,'Sin retiros en el período'));
+  destroyChart('chart-ret-motivo');
+  charts['chart-ret-motivo'] = new Chart(document.getElementById('chart-ret-motivo'), {
+    type:'bar',
+    data:{ labels: sortedMotivo.slice(0,10).map(([m]) => m.length>22 ? m.slice(0,21)+'…' : m),
+           datasets:[{label:'Retiros', data:sortedMotivo.slice(0,10).map(([,c])=>c),
+             backgroundColor:'#F47920', borderRadius:4}] },
+    options: chartOpts('Cantidad', true)
+  });
+
+  // ── Tipo (Voluntaria / Involuntaria / Nunca trabajó) + tenure promedio por tipo
+  const porTipo = {};
+  data.forEach(r => {
+    if (!porTipo[r.tipo]) porTipo[r.tipo] = {count:0, sumT:0, nT:0};
+    porTipo[r.tipo].count++;
+    if (r.tenure != null && r.tenure >= 0) { porTipo[r.tipo].sumT += r.tenure; porTipo[r.tipo].nT++; }
+  });
+  const sortedTipo = Object.entries(porTipo).sort((a,b)=>b[1].count-a[1].count);
+  tbl('tbl-ret-tipo', sortedTipo.length
+    ? sortedTipo.map(([t,v]) => {
+        const prom = v.nT ? Math.round(v.sumT/v.nT) + ' d' : '–';
+        const cls = t==='Voluntaria' ? 'badge-green' : t==='Nunca trabajó' ? 'badge-red' : 'badge-orange';
+        return `<tr><td><span class="badge ${cls}">${t}</span></td><td style="text-align:right">${v.count}</td><td style="text-align:right">${prom}</td></tr>`;
+      }).join('')
+    : empty(3));
+  destroyChart('chart-ret-tipo');
+  const tipoColors = sortedTipo.map(([t]) => t==='Voluntaria' ? '#38A169' : t==='Nunca trabajó' ? '#E53E3E' : '#F47920');
+  charts['chart-ret-tipo'] = new Chart(document.getElementById('chart-ret-tipo'), {
+    type:'doughnut',
+    data:{ labels: sortedTipo.map(([t])=>t),
+           datasets:[{ data: sortedTipo.map(([,v])=>v.count), backgroundColor: tipoColors, borderWidth:2, borderColor:'#fff' }] },
+    options:{ responsive:true, maintainAspectRatio:true, plugins:{ legend:{position:'bottom', labels:{font:{family:'Barlow',size:11}}} } }
+  });
+
+  // ── Top cargos con rotación
+  const porCargo = {};
+  data.forEach(r => {
+    const c = r.cargo || '(Sin cargo)';
+    if (!porCargo[c]) porCargo[c] = {count:0, sumT:0, nT:0};
+    porCargo[c].count++;
+    if (r.tenure != null && r.tenure >= 0) { porCargo[c].sumT += r.tenure; porCargo[c].nT++; }
+  });
+  const sortedCargo = Object.entries(porCargo).sort((a,b)=>b[1].count-a[1].count).slice(0,10);
+  tbl('tbl-ret-cargo', sortedCargo.length
+    ? sortedCargo.map(([c,v]) => {
+        const prom = v.nT ? Math.round(v.sumT/v.nT) + ' d' : '–';
+        return `<tr><td>${c}</td><td style="text-align:right">${v.count}</td><td style="text-align:right">${prom}</td></tr>`;
+      }).join('')
+    : empty(3));
+  destroyChart('chart-ret-cargo');
+  charts['chart-ret-cargo'] = new Chart(document.getElementById('chart-ret-cargo'), {
+    type:'bar',
+    data:{ labels: sortedCargo.map(([c]) => c.length>22 ? c.slice(0,21)+'…' : c),
+           datasets:[{label:'Retiros', data:sortedCargo.map(([,v])=>v.count),
+             backgroundColor:'#F47920', borderRadius:4}] },
+    options: chartOpts('Cantidad', true)
+  });
+
+  // ── Evolución mensual (por F.Retiro YYYY-MM)
+  const porMes = {};
+  data.forEach(r => {
+    if (!r.fRetiro) return;
+    const k = r.fRetiro.getFullYear() + '-' + String(r.fRetiro.getMonth()+1).padStart(2,'0');
+    porMes[k] = (porMes[k]||0)+1;
+  });
+  const sortedMes = Object.keys(porMes).sort();
+  destroyChart('chart-ret-evol');
+  charts['chart-ret-evol'] = new Chart(document.getElementById('chart-ret-evol'), {
+    type:'line',
+    data:{ labels: sortedMes.map(k => {
+              const [y,m] = k.split('-');
+              return (MESES[m]||m) + ' ' + y.slice(2);
+           }),
+           datasets:[{ label:'Retiros', data: sortedMes.map(k=>porMes[k]),
+             borderColor:'#E53E3E', backgroundColor:'rgba(229,62,62,0.12)',
+             tension:0.35, fill:true, pointRadius:3, pointBackgroundColor:'#E53E3E', borderWidth:2 }] },
+    options: chartOpts('Cantidad')
+  });
+
+  // ── Distribución por tenure (buckets)
+  const bucketOrden = ['Mismo día (0d)','≤ 7 días','8–30 días','31–90 días','91–180 días','> 180 días','Sin dato'];
+  const porBucket = {};
+  data.forEach(r => { const b = bucketTenure(r.tenure); porBucket[b] = (porBucket[b]||0)+1; });
+  const bucketRows = bucketOrden.filter(b => porBucket[b]).map(b => [b, porBucket[b]]);
+  tbl('tbl-ret-tenure', bucketRows.length
+    ? bucketRows.map(([b,c]) => {
+        const p = total > 0 ? ((c/total)*100).toFixed(1) : '0';
+        return `<tr><td>${b}</td><td style="text-align:right">${c}</td><td style="text-align:right">${p}%</td></tr>`;
+      }).join('')
+      + `<tr style="font-weight:700"><td>Total</td><td style="text-align:right">${total}</td><td style="text-align:right">100%</td></tr>`
+    : empty(3));
+  const bucketColors = {
+    'Mismo día (0d)':'#9B2C2C', '≤ 7 días':'#E53E3E', '8–30 días':'#F47920',
+    '31–90 días':'#D69E2E', '91–180 días':'#3182CE', '> 180 días':'#38A169', 'Sin dato':'#A0AEC0'
+  };
+  destroyChart('chart-ret-tenure');
+  charts['chart-ret-tenure'] = new Chart(document.getElementById('chart-ret-tenure'), {
+    type:'bar',
+    data:{ labels: bucketRows.map(([b])=>b),
+           datasets:[{ label:'Retiros', data: bucketRows.map(([,c])=>c),
+             backgroundColor: bucketRows.map(([b])=>bucketColors[b]||'#F47920'), borderRadius:4 }] },
+    options: chartOpts('Cantidad')
+  });
+
+  // ── Tabla detalle
+  set('badge-ret-detalle', total);
+  const sortedDet = [...data].sort((a,b) => {
+    if (a.fRetiro && b.fRetiro) return b.fRetiro - a.fRetiro; // recientes primero
+    return 0;
+  });
+  tbl('tbl-ret-detalle', sortedDet.length
+    ? sortedDet.map(r => {
+        let tBadge;
+        if (r.tenure == null || isNaN(r.tenure)) tBadge = `<span class="badge badge-gray">–</span>`;
+        else if (r.tenure <= 0)  tBadge = `<span class="badge badge-red">${r.tenure}d</span>`;
+        else if (r.tenure <= 7)  tBadge = `<span class="badge badge-red">${r.tenure}d</span>`;
+        else if (r.tenure <= 30) tBadge = `<span class="badge badge-orange">${r.tenure}d</span>`;
+        else if (r.tenure <= 90) tBadge = `<span class="badge badge-yellow">${r.tenure}d</span>`;
+        else                     tBadge = `<span class="badge badge-green">${r.tenure}d</span>`;
+        const tipoCls = r.tipo==='Voluntaria' ? 'badge-green' : r.tipo==='Nunca trabajó' ? 'badge-red' : 'badge-orange';
+        return `<tr data-id="${r.cedula}">
+          <td>${r.cedula}</td>
+          <td style="font-weight:500">${r.nombre}</td>
+          <td><span class="badge badge-gray">${r.cargo||'–'}</span></td>
+          <td>${fmtDate(r.fIngreso)}</td>
+          <td>${fmtDate(r.fRetiro)}</td>
+          <td style="text-align:center">${tBadge}</td>
+          <td>${r.motivo||'–'}</td>
+          <td><span class="badge ${tipoCls}">${r.tipo}</span></td>
+        </tr>`;
+      }).join('')
+    : empty(8,'Sin retiros en el período'));
+}
+
 // ─── CHART OPTIONS ────────────────────────────────────────────────────────────
 function chartOpts(yLabel, horizontal=false) {
   return {
@@ -1223,6 +1707,64 @@ function exportarDescansosCSV() {
   a.download = `descansos_itagui_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function exportarRetirosExcel() {
+  const rows = document.querySelectorAll('#tbl-ret-detalle tr');
+  if (!rows.length) return;
+
+  const data = [
+    ['Cédula','Nombre','Cargo','F. Ingreso','F. Retiro','Tenure (días)','Motivo','Tipo']
+  ];
+  const tipos = [];
+
+  rows.forEach(tr => {
+    const celdas = tr.querySelectorAll('td');
+    if (!celdas.length) return;
+    const cedula = tr.getAttribute('data-id') || celdas[0]?.textContent.trim() || '';
+    const tenureTxt = (celdas[5]?.textContent || '').replace('d','').trim();
+    const tipoTxt = celdas[7]?.textContent.trim() || '';
+    data.push([
+      cedula,
+      celdas[1]?.textContent.trim(),
+      celdas[2]?.textContent.trim(),
+      celdas[3]?.textContent.trim(),
+      celdas[4]?.textContent.trim(),
+      tenureTxt,
+      celdas[6]?.textContent.trim(),
+      tipoTxt
+    ]);
+    tipos.push(tipoTxt.toLowerCase());
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [
+    { wch: 14 }, { wch: 32 }, { wch: 26 }, { wch: 14 },
+    { wch: 14 }, { wch: 12 }, { wch: 38 }, { wch: 16 }
+  ];
+
+  // Header bold
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let Cc = range.s.c; Cc <= range.e.c; ++Cc) {
+    const cell = ws[XLSX.utils.encode_cell({ r: 0, c: Cc })];
+    if (cell) cell.s = { font:{bold:true}, alignment:{horizontal:'center'} };
+  }
+
+  // Color por tipo (columna 7 = Tipo)
+  tipos.forEach((t, i) => {
+    const ref = XLSX.utils.encode_cell({ r: i+1, c: 7 });
+    const cell = ws[ref];
+    if (!cell) return;
+    let color = null;
+    if (t.includes('nunca')) color = 'FFC7CE';
+    else if (t.includes('involuntaria')) color = 'FFEB9C';
+    else if (t.includes('voluntaria')) color = 'C6EFCE';
+    if (color) cell.s = { fill: { patternType:'solid', fgColor:{ rgb: color } } };
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Retiros');
+  XLSX.writeFile(wb, `retiros_itagui_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
